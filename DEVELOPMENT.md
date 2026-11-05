@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P0～P2 已验证；P3 切换器、真实链接和搜索联动已实现并通过自动化，真实浏览器导航/手机布局验收仍待完成。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
+> 当前状态：P0～P2 已验证；P3 链接/搜索与 P4 服务菜单已实现并通过自动化，真实浏览器导航/菜单/手机布局验收仍待完成。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
 
 ## 1. 阅读顺序
 
@@ -116,7 +116,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线及 P1/P2 已完成，P3 代码与自动化已完成但真实浏览器验收待做；外部仓库设置待授权，P4～P6 未实现。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
+P0 本地基线及 P1/P2 已完成，P3/P4 代码与自动化已完成但真实浏览器验收待做；外部仓库设置待授权，P5/P6 未完成。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
 
 ### P0：建立可信开发基线
 
@@ -244,17 +244,44 @@ Vitest 有两条既有嵌套 `vi.unmock` 提升警告，位于 `src/utils/proxy/
 
 本地脚本、虚构配置和证据位于 Git/Docker 忽略的 `config/p3-baseline/`；原日志 `/tmp/homepage-p3-{install,focused,coverage,lint,test,build,smoke}.log` 及 `server-{enabled,disabled,legacy}.log` 归档到 evidence/。临时服务只监听 `127.0.0.1:3307`，随机认证密钥/密码/Cookie 不落盘。本次生产 SSR 验证使用 HTMLParser 读取真实响应，不是浏览器水合、布局或原生点击验证。
 
-当前 P3 未提交/推送，未进入 P4、未发布部署。主动诊断中的 advisory 来自 QuickLaunch/首页既有代码，以及翻译内已有 pyload/criticals 等字段的拼写提示，未为消除提示改动上游字段。后续先安排真实浏览器环境补验，P4 是否开始需用户确认。
+P3 后续已按用户要求提交/推送为 `3f7aed7e`（含保留的 JSON 格式调整），本轮 P4 状态见下一节；未发布部署。主动诊断中的 advisory 来自 QuickLaunch/首页既有代码，以及翻译内已有 pyload/criticals 等字段的拼写提示，未为消除提示改动上游字段。后续先安排真实浏览器环境补验，P4 是否开始需用户确认。
 
 ### P4：服务菜单与无障碍
 
-- [ ] 右键仅导航区接管，Widget/统计操作保持原生。
-- [ ] 可见更多按钮、菜单 Portal/视口定位。
-- [ ] 默认/备用地址链接、当前来源标记、复制当前地址。
-- [ ] 单菜单互斥、滚动/外部点击关闭、焦点恢复、按键事件隔离。
-- [ ] Clipboard 失败提示、Shift+右键回退。
+- [x] 右键仅导航区接管，Widget/统计操作保持原生。
+- [x] 可见更多按钮、菜单 Portal/视口定位。
+- [x] 默认/备用地址链接、当前来源标记、复制当前地址。
+- [x] 单菜单互斥、滚动/外部点击关闭、焦点恢复、按键事件隔离。
+- [x] Clipboard 失败提示、Shift+右键回退。
+- [ ] 原生中键/Ctrl-Cmd/右键/Shift、实际菜单边缘/遮挡、触屏及键盘焦点的真实浏览器验收：环境仍无浏览器，不把 jsdom 当成通过。
 
-验收：SPEC T21～T25；真实浏览器验证中键/右键/移动布局，不只靠 jsdom。
+2026-11-05 P4 代码与自动化验收：覆盖 SPEC T21～T25 及菜单侧 T07/T08/T16/T22/T30 的相关部分；真实浏览器要求仍未完成，不宣称完整 v1 已完成。
+
+实际命令使用 Node `v24.22.1` / `corepack pnpm@10.34.9`：
+
+| 检查          | 命令 / 结果                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 依赖          | `install --frozen-lockfile` 通过，package.json / 锁文件不变                                                                                                                                                                                                                                                                                                                                                                              |
+| 聚焦回归      | `exec vitest run src/components/network src/utils/network src/utils/contexts/network.test.jsx src/components/services/item.test.jsx src/components/quicklaunch.test.jsx src/__tests__/pages/index.test.jsx src/__tests__/pages/_app.test.jsx`：13 文件 / 362 测试通过                                                                                                                                                                    |
+| 完整回归      | `test`：583 文件 / 2229 测试通过，比 P3 新增 49 项，107.95 秒；仅两条原有 vi.unmock 警告                                                                                                                                                                                                                                                                                                                                                 |
+| Lint          | `lint` 通过                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 覆盖率        | `exec vitest run src/components/network/service-menu.test.jsx src/utils/network/menu-position.test.js src/components/services/item.test.jsx src/utils/contexts/network.test.jsx --coverage --coverage.include='src/components/network/service-menu.jsx' --coverage.include='src/utils/contexts/service-menu.jsx' --coverage.include='src/utils/network/menu-position.js'`：4 文件 / 102 测试通过；新模块行 100%、分支 94.3%、函数 97.72% |
+| 生产构建/SSR  | 在 P4 工作树复用 `python3 config/p3-baseline/run-baseline.py`，构建及 enabled/disabled/legacy 三配置 standalone SSR/API/登录退出/私有缓存响应头回归全部通过，三个临时实例均停止；不等于菜单浏览器验收                                                                                                                                                                                                                                    |
+| 主动诊断/格式 | 13 文件：7 个 JS/JSX clean，两个 JSON 留有 5 条既有 widget ID/文案拼写提示；4 文档无语言服务答复（inconclusive），不计为通过；代码 Prettier、复用脚本 py_compile、JSON/文档静态及 git diff --check 通过                                                                                                                                                                                                                                  |
+
+实施边界与证据：
+
+- 新增 contexts/service-menu.jsx、network/service-menu.jsx 及组件测试、network/menu-position.js 及纯函数测试。NetworkProvider 仅增加独立菜单 Provider 包裹，偏好合同不变；卡片仅给两处 anchor 绑定右键，在链接外加入按钮并预留统计标签位置。只增加 en/zh-Hans 的 8 项文案，没有新增依赖。
+- 使用现有 Headless UI Portal；右键坐标、全局单菜单和外部状态失效需要受控菜单，所以自行实现小型 ARIA 焦点/键盘层，不通过隐藏按钮 click 或 DOM 注入驱动 Headless Menu。菜单状态记录按身份比较，旧关闭定时器和异步复制不能影响新菜单；不读写 YAML、SWR、模式偏好或后端连接。
+- 链接保留真实 href/target/rel，原生激活完成后才用可清理的零延时任务关闭；测试确认合成 Ctrl/辅助点击未被取消，但不声称浏览器真的打开新标签页。焦点只回到仍连接的触发器，菜单内滚动不关闭，菜单键不触发主页搜索。
+- Clipboard 只在用户事件调用，检查安全上下文/API；成功才显示成功，异常/拒绝/缺失显示错误，不输出地址或异常内容，不加 execCommand/旧式 DOM 复制。等待时焦点留在菜单；复制完成不抢走后续菜单焦点。
+- 新增组件测试最初对统计按钮的完整可访问名称假设错误（含 mock 状态文字），已改为查询明确的统计功能标签；未弱化旧断言、未修改上游控件以迎合测试。
+
+日志副本与源码校验和在被 Git/Docker 忽略的 `config/p4-baseline/evidence/`。原始日志 `/tmp/homepage-p4-{install,focused,coverage,lint,test,build,smoke}.log` 及 `server-{enabled,disabled,legacy}.log`；复用的脚本仍在 p3-baseline，日志 PASS 文案中的 P3 属于脚本名称，旧 P3 evidence 未被覆盖。临时服务仅绑定 `127.0.0.1:3307`，真实认证凭据/Cookie 不落盘。
+
+P4 没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持原样。尚未运行真实浏览器、触屏、多标签页、OIDC、HTTPS/反代/CDN 验收；菜单几何 mock 只证明坐标计算，不证明真实 CSS 未裁剪。P4 尚未提交/推送，未进入 P5、未发布部署。
+
+验收仍需：真实浏览器验证中键/右键/移动布局，不只靠 jsdom。
 
 ### P5：安全、兼容与使用文档
 

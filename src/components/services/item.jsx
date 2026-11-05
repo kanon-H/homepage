@@ -8,8 +8,10 @@ import SiteMonitor from "./site-monitor";
 import Status from "./status";
 import Widget from "./widget";
 
+import ServiceMenu from "components/network/service-menu";
 import ResolvedIcon from "components/resolvedicon";
 import { useNetwork } from "utils/contexts/network";
+import { useServiceMenuTrigger } from "utils/contexts/service-menu";
 import { SettingsContext } from "utils/contexts/settings";
 import { getServiceNavigation } from "utils/network/navigation";
 import Docker from "widgets/docker/component";
@@ -18,7 +20,9 @@ import ProxmoxVM from "widgets/proxmoxvm/component";
 
 export default function Item({ service, groupName, useEqualHeights }) {
   const network = useNetwork();
-  const { href, hasLink } = getServiceNavigation(service, network);
+  const navigation = getServiceNavigation(service, network);
+  const { href, hasLink } = navigation;
+  const menu = useServiceMenuTrigger({ service, network, navigation });
   const { settings } = useContext(SettingsContext);
   const showStats = service.showStats === false ? false : settings.showStats;
   const statusStyle = service.statusStyle !== undefined ? service.statusStyle : settings.statusStyle;
@@ -55,6 +59,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
             (hasLink ? (
               <a
                 href={href}
+                onContextMenu={menu.onContextMenu}
                 target={service.target ?? settings.target ?? "_blank"}
                 rel="noreferrer"
                 className="shrink-0 flex items-center justify-center w-12 service-icon z-10"
@@ -71,6 +76,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
           {hasLink ? (
             <a
               href={href}
+              onContextMenu={menu.onContextMenu}
               target={service.target ?? settings.target ?? "_blank"}
               rel="noreferrer"
               className="flex-1 flex items-center justify-between rounded-r-md service-title-text"
@@ -93,8 +99,16 @@ export default function Item({ service, groupName, useEqualHeights }) {
             </div>
           )}
 
+          <ServiceMenu
+            service={service}
+            network={network}
+            navigation={navigation}
+            menu={menu}
+            target={service.target ?? settings.target ?? "_blank"}
+          />
+
           <div
-            className={`absolute top-0 right-0 flex flex-row justify-end ${
+            className={`absolute top-0 ${menu.enabled ? "right-10" : "right-0"} flex flex-row justify-end ${
               statusStyle === "dot" ? "gap-0" : "gap-2 mr-2"
             } z-10 service-tags`}
           >

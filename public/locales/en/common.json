@@ -26,7 +26,15 @@
   "network": {
     "mode": "Network mode",
     "default": "Default",
-    "restoring": "Restoring network preference…"
+    "restoring": "Restoring network preference…",
+    "addressesForService": "Addresses for {{name}}",
+    "openDefault": "Open default address",
+    "openMode": "Open {{label}} address",
+    "current": "Current",
+    "usingDefault": "Currently using the default address",
+    "copyCurrent": "Copy current address",
+    "copied": "Address copied",
+    "copyFailed": "Unable to copy. Use HTTPS and allow clipboard access."
   },
   "widget": {
     "missing_type": "Missing Widget Type: {{type}}",

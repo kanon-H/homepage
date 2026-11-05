@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore } from "react";
 
+import { ServiceMenuProvider } from "./service-menu";
+
 import { normalizeNetworkSettings } from "utils/network/config";
 import {
   NETWORK_PREFERENCE_KEY,
@@ -84,7 +86,11 @@ export function NetworkProvider({ initialSettings, children }) {
     [settings, ready, store],
   );
   const value = useMemo(() => ({ settings, mode, ready, setMode }), [settings, mode, ready, setMode]);
-  return <NetworkContext.Provider value={value}>{children}</NetworkContext.Provider>;
+  return (
+    <NetworkContext.Provider value={value}>
+      <ServiceMenuProvider>{children}</ServiceMenuProvider>
+    </NetworkContext.Provider>
+  );
 }
 
 export function useNetwork() {

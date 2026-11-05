@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P0～P2 已验证；P3 切换器、真实卡片/搜索链接已实现并通过自动化，真实浏览器验收和 P4 菜单尚未完成。本文区分现有模块与后续设计，不表示扩展整体已验收。
+> 状态：P0～P2 已验证；P3 切换器/链接/搜索与 P4 服务菜单已实现并通过自动化，真实浏览器及 P5/P6 全量验收尚未完成。本文区分现有模块与后续设计，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -130,7 +130,7 @@ extensions:
 ```
 
 ```yaml
-# services.yaml：P1 校验/过滤、P3 卡片与搜索联动已实现；服务菜单待 P4
+# services.yaml：P1 校验/过滤、P3 链接/搜索、P4 菜单已实现；完整验收待 P5
 - 基础设施:
     - NAS:
         href: https://nas.example.com
@@ -157,7 +157,7 @@ v1 采用现有 YAML，不增加服务配置文件。保留未知的其他扩展
 
 ## 5. 核心架构
 
-### 5.1 模块布局（P1～P3 已实现部分与后续计划）
+### 5.1 模块布局（P1～P4 已实现）
 
 为沿用现有 alias，不额外增加 `extensions` 路径别名。逻辑仍独立，只通过少量接入点集成：
 
@@ -166,18 +166,20 @@ src/utils/network/
   config.js                 # 配置规范化、地址过滤、诊断结果，纯函数
   resolver.js               # 解析某模式地址、构造菜单项目，纯函数
   navigation.js             # P3 独立的 UI ready 适配与服务搜索派生，纯函数
+  menu-position.js          # P4 视口内固定坐标计算，纯函数
   server.js                 # P1 服务响应过滤入口与去重脱敏日志，服务端专用
   storage.js                # 带异常保护的偏好读写，浏览器适配层
   *.test.js
 src/utils/contexts/network.jsx
 src/utils/contexts/network.test.jsx
+src/utils/contexts/service-menu.jsx   # P4 单菜单协调器与触发 Hook
 src/components/network/
   mode-switcher.jsx
   service-menu.jsx
   *.test.jsx
 ```
 
-P1 已实现 config.js、resolver.js、server.js 及纯逻辑/响应集成测试；P2 已实现 storage.js、contexts/network.jsx 及测试；P3 已实现 navigation.js、mode-switcher.jsx 和卡片/搜索/页面接入及测试。service-menu.jsx 仍待 P4。接口职责不能散落：
+P1 已实现 config.js、resolver.js、server.js 及测试；P2 已实现 storage.js、contexts/network.jsx 及测试；P3 已实现 navigation.js、mode-switcher.jsx 和导航接入；P4 已实现单菜单协调器、service-menu.jsx、定位与相关测试。接口职责不能散落：
 
 ```text
 normalizeNetworkSettings(rawSettings)
@@ -227,6 +229,8 @@ P2 状态实现：
 - 禁用时 ready 为 true、mode 为内置 default，不访问存储，也不清除旧偏好；清理订阅时重置恢复快照，重新启用时需重读并完成 ready。StrictMode 重复订阅及卸载移除对应监听器。
 - 默认上下文无副作用；完整上下文为 `{ settings, mode, ready, setMode }`，settings 是 P1 规范化结果而非 SettingsContext 的临时空对象。配置变化来源为 initialSettings 属性更新。
 
+P4 在 NetworkContext 下增加独立 ServiceMenuProvider，不改变上述公开模式合同。菜单通过自有 useSyncExternalStore 保存单个活动记录（owner、打开序号、触发器、坐标及当前 service/settings/mode 身份），只有用户事件才记录 DOM 对象；创建/SSR 快照不访问浏览器。新打开替换旧记录；关闭只接受仍活动的记录身份，旧关闭任务/复制结果不能影响新菜单。服务、模式或配置失效时立即隐藏，再在生命周期释放记录并按需恢复焦点。
+
 ### 5.3 共享数据与页面派生数据
 
 服务器始终返回所有已配置导航候选；浏览器在本地选择模式：
@@ -265,7 +269,7 @@ P3 内部接口和接入：
 
 组件状态、统计按钮、Widget 正常工作，不应因为短暂恢复而卸载整张卡片。
 
-P2 已提供 ready 合同；P3 已在真实图标/标题及搜索打开入口实施恢复抑制，并用真实卡片 renderToString/hydrateRoot 验证未出现默认 href。菜单抑制待 P4；这里的组件和生产 SSR 验证不等于真实浏览器的中键/原生右键/手机验收。
+P2 已提供 ready 合同；P3 已在图标/标题及搜索打开入口实施恢复抑制，并用真实卡片 renderToString/hydrateRoot 验证未出现默认 href；P4 只有可扩展且 ready 的服务才生成更多按钮/右键处理。组件和生产 SSR 验证不等于真实浏览器的中键/原生右键/手机验收。
 
 ## 6. UI 与交互
 
@@ -273,23 +277,27 @@ P2 已提供 ready 合同；P3 已在真实图标/标题及搜索打开入口实
 
 放在首页顶部信息区的右侧，不能误放在当前上游 footer 的主题切换区。没有信息 Widget 时仍要显示；手机布局换行但保持可访问，不遮住搜索入口。
 
-P3 使用原生 label/select，只在扩展启用且存在备用模式时显示；恢复期间禁用，切换后立即更新卡片与搜索。右侧容器不再依赖 widgets 是否返回，select 限宽且父级可换行，避免长标签撑宽；实际手机/触屏布局仍待浏览器验收。缺少某模式地址时回退原始 `href`；菜单中的 fallback 说明待 P4，不做可达性探测。
+P3 使用原生 label/select，只在扩展启用且存在备用模式时显示；恢复期间禁用，切换后立即更新卡片与搜索。右侧容器不再依赖 widgets 是否返回，select 限宽且父级可换行，避免长标签撑宽；实际手机/触屏布局仍待浏览器验收。缺少某模式地址时回退原始 `href`；P4 菜单显示 fallback 说明，不做可达性探测。
 
 ### 6.2 服务菜单
 
 右键限定在服务导航区域，不能吞掉 Widget、统计按钮、输入框的原生操作。具有有效备用地址时才接管右键；Shift+右键不调用 `preventDefault`，作为浏览器原生菜单的尽力回退，仍以浏览器实际行为为准。
 
-“更多”按钮提供触屏和键盘入口，不能嵌进 `<a>`。菜单建议使用现有 Headless UI，配合 Portal/定位机制，避免卡片 `overflow-clip` 裁剪。
+P4 的可见“更多”按钮位于 anchor 外，为触屏/键盘提供入口，统计标签相应右移避免按钮覆盖。只有标题/图标 anchor 绑定 onContextMenu，Widget、统计按钮和卡片空白区保持原生；Shift 不 preventDefault。
 
-菜单条目使用真实链接；复制动作使用按钮。显示模式标签，避免重复“当前地址”链接。不同模式恰好同 URL 时保留模式语义，不擅自删除用户定义的模式条目。
+使用现有 Headless UI Portal；因为原生右键坐标和单菜单互斥需要受控状态，选择小型受控 ARIA menu，而不是通过隐藏按钮 click 驱动非受控 Headless Menu。菜单 fixed 放在 Portal，按测量的宽高/视口用 8px 间距夹取坐标；max-width/max-height 和菜单内部滚动支持长标签/短视口。节点 ref 在提交阶段测量，ResizeObserver 和反馈后的 RAF 重测；不在 Render 读取浏览器 API，也不做 DOM 注入。
 
-支持外部点击关闭、Escape 关闭、方向键导航、焦点回到触发器、视口边缘定位。详细行为见规约。
+菜单条目复用 getServiceAddressOptions，保留真实 href/target/rel；复制使用按钮。模式标签按文本显示，不展示完整 URL 作标题，不重复当前链接，相同 URL 的模式不合并；当前来源用 aria-current/文案标记，回退另有说明。普通链接激活后用可清理的零延时关闭任务，确保先完成原生动作；辅助点击不被取消，不改偏好。
+
+单菜单、外部 pointer/click/contextmenu、页面滚动/窗口缩放、Escape/Tab、mode/settings/service 失效或服务消失均处理关闭。菜单内部滚动不关闭。焦点回到仍连接的触发器；方向键循环、Home/End、原生 Enter、Space 链接激活和菜单键传播隔离覆盖主页快捷键边界。严格清理事件监听、Observer、RAF 和关闭任务，支持 StrictMode。
+
+Clipboard 仅在用户事件中调用，要求安全上下文及 API；成功才提示成功，拒绝/缺失/异常给失败反馈，不用 execCommand/DOM hack、不输出原 URL 或异常。复制等待中将焦点保留在菜单，旧异步结果按记录身份忽略，不能污染新菜单或抢走焦点。真实浏览器定位、焦点、原生中键/右键及触屏仍待实际验收。
 
 ## 7. 配置校验与诊断
 
 当前 `/api/validate` 主要检查 YAML 语法，不能假设已有新字段语义校验。
 
-P1 已在共享服务响应边界复用纯规范化函数，做到（UI 恢复和菜单错误仍待后续阶段）：
+P1 已在共享服务响应边界复用纯规范化函数；P3/P4 已提供 UI 恢复和菜单局部错误处理，整体仍需浏览器验收：
 
 1. 页面可用优先：新扩展有错时局部降级，不使全部首页崩溃。
 2. 全局结构错误降级为扩展关闭；单一模式/单一地址错误只忽略局部。
@@ -346,11 +354,10 @@ gethomepage/homepage main
 
 ## 11. 当前交付状态
 
-当前分支 `feature/multi-address`，P2 已按用户要求提交推送，HEAD 为 `73d36b37`。2026-11-05 P3 代码与自动化已完成，本轮尚未提交：
+当前分支 `feature/multi-address`，P3 已按用户要求提交推送，HEAD 为 `3f7aed7e`。2026-11-05 P4 代码与自动化已完成，本轮尚未提交：
 
-- 顶部模式切换器、卡片图标/标题真实链接、服务搜索不可变派生和 ready 保护已接入；普通服务/书签保持原行为，菜单尚待 P4。
-- P1/P2 核心及服务器共享数据不变；不修改 Widget/监控目标、认证、依赖/锁文件、远程设置或 Actions。
-- Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、581 个测试文件 / 2180 项测试及生产构建通过；新模块覆盖率行/分支/函数 100%。
-- 卡片真实 SSR/hydration、搜索 click/Enter/存储事件、无 Widget 顶部与文案回退通过自动化。生产 enabled/disabled/legacy 三配置 standalone SSR/认证回归通过，临时实例均已停止。
-- 没有真实浏览器可执行程序，未完成原生中键/Ctrl-Cmd/右键、窄屏/触屏、真实多标签页、OIDC 或反代缓存验收；不宣称完整 v1 完成。
-- P0 外部设置仍待授权；下一步安排浏览器补验，P4 需用户确认后开始。没有发布部署，证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。
+- 已新增单菜单协调器、右键/更多按钮、Portal、视口定位、真实地址候选/当前来源、复制反馈和键盘/焦点/关闭规则；复用原解析与导航合同，不改偏好或 Widget/监控连接。
+- Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、583 个测试文件 / 2229 项测试及生产构建通过；新增模块行覆盖 100%、分支 94.3%、函数 97.72%。
+- 菜单范围、互斥、焦点/键盘、合成原生事件不取消、异步复制隔离、长菜单滚动及测量坐标通过自动化；复用 enabled/disabled/legacy 三配置 standalone SSR/认证回归，实例均已停止。
+- 没有真实浏览器可执行程序，原生中键/Ctrl-Cmd/右键/Shift、菜单真实裁剪/边缘、窄屏/触屏/焦点、真实多标签页、OIDC 及反代缓存仍未验收，不宣称完整 v1 完成。
+- 未修改依赖/锁文件、认证、Widget 白名单、后端配置、远程设置或 Actions，没有发布部署。P0 外部设置仍待授权，P5 需用户确认后开始；证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。

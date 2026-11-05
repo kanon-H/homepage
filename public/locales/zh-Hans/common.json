@@ -26,7 +26,15 @@
   "network": {
     "mode": "网络模式",
     "default": "默认",
-    "restoring": "正在恢复网络偏好…"
+    "restoring": "正在恢复网络偏好…",
+    "addressesForService": "{{name}} 的地址菜单",
+    "openDefault": "打开默认地址",
+    "openMode": "打开{{label}}地址",
+    "current": "当前",
+    "usingDefault": "当前使用默认地址",
+    "copyCurrent": "复制当前地址",
+    "copied": "地址已复制",
+    "copyFailed": "无法复制，请使用 HTTPS 并允许剪贴板访问。"
   },
   "widget": {
     "missing_type": "缺失的组件类型: {{type}}",

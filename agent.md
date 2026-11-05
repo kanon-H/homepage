@@ -24,9 +24,31 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：P3 链接/切换器/搜索已实现并通过自动化，真实浏览器验收待做
+## 当前状态：P4 菜单已实现并通过自动化，P3/P4 真实浏览器验收待做
 
-当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`，HEAD 为 `73d36b374ba165e4ad2fb51270b394702750af7e`。P2 已按用户要求提交并推送；本轮 P3 尚未提交或推送，不自动沿用前次授权。
+当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`，HEAD 为 `3f7aed7eba3d90301c86ff9bc073f8ae2b274d54`。P3 已按用户要求提交并推送（保留 JSON 格式调整）；本轮 P4 尚未提交或推送，不自动沿用前次授权。
+
+2026-11-05 P4 实际变更：
+
+- 新增 `src/utils/contexts/service-menu.jsx`：NetworkProvider 内独立的单菜单协调器/触发 Hook，不保存全局模式或偏好；根据打开记录身份及 mode/settings/service 校验，关闭旧记录不会误关新菜单。network.jsx 只增加此 Provider 包裹，原偏好逻辑不变。
+- 新增 `src/components/network/service-menu.jsx` 及测试，使用现有 Headless UI Portal 与受控 ARIA menu：更多按钮可见且不在链接内；右键仅绑定图标/标题 anchor，Shift 回退原生，Widget/统计不接管；统计标签为更多按钮让出右侧空间。
+- 菜单复用 P1 候选和 P3 导航，包含默认/已配置模式的真实 anchor、当前来源、fallback 说明及复制按钮；同 URL 不合并模式。target/rel 与卡片一致，临时打开不改偏好；链接激活后延迟关闭以保留原生动作，旧关闭任务有清理/身份保护。
+- 新增 `menu-position.js` 及测试，按实际测量将 fixed 菜单限制在视口内；Portal 避免卡片 overflow-clip。外部点击/右键、页面滚动、窗口缩放、Escape/Tab、模式/配置/服务变化关闭，菜单自身滚动不关闭；方向键/Home/End、Space 链接激活及焦点返回已测试。
+- 复制只用安全上下文 Clipboard API，失败/缺失/拒绝给错误反馈，不用 DOM hack，不假报成功；等待复制时焦点保持在菜单，旧异步结果不会污染新菜单。只新增 en/zh-Hans 的 8 项菜单文案。
+
+P4 验证（Node `v24.22.1` / pnpm `10.34.9`）：
+
+- frozen install、Lint、生产构建通过；聚焦 13 文件 / 362 测试、全量 583 文件 / 2229 测试通过（比 P3 新增 49 项），全量耗时 107.95 秒；仅两条已有 vi.unmock 警告。
+- 新菜单、协调器、定位模块聚焦覆盖：行 100%、分支 94.3%、函数 97.72%；覆盖率运行 4 文件 / 102 测试通过，不以覆盖率代替真实浏览器验收。
+- 在 P4 工作树复用 `python3 config/p3-baseline/run-baseline.py` 构建并运行 enabled/disabled/legacy 三配置 standalone HTTP/SSR/认证回归，全部通过，临时实例均已停止。日志 P3 字样来自复用脚本，不代表真实菜单点击验收。
+- 本轮日志和源码校验和归档至 Git/Docker 忽略的 `config/p4-baseline/evidence/`；复现脚本仍在 p3-baseline，认证密钥/密码/Cookie 仅在内存。没有新增依赖或浏览器下载。
+- 主动检查 13 个文件：7 个 JS/JSX 均 clean；两个 JSON 保留 5 条已有 widget ID/文案拼写提示；4 份 Markdown 无语言服务答复（inconclusive），未计为 LSP 通过。代码 Prettier、复用脚本 py_compile、JSON/文档静态及 git diff --check 通过；未改动 P3 已说明的 QuickLaunch 单点规则例外。
+
+未完成：真实中键/Ctrl-Cmd/原生右键/Shift 行为、菜单边缘定位/遮挡、窄屏/触屏/键盘实际焦点、真实多标签页、OIDC 与反代/CDN 验收；P5/P6、P0 外部设置仍待授权。当前没有浏览器可执行程序，jsdom 的合成事件/测量 mock 不算原生浏览器证据。本轮未进入 P5、未提交推送、未发布部署。
+
+### P3 链接/切换器/搜索记录（历史）
+
+P3 验证时 HEAD 为 `73d36b37`，随后源码、文档与 JSON 格式调整已按用户要求提交推送为 `3f7aed7e`。
 
 2026-11-05 P3 实际变更：
 
@@ -45,7 +67,7 @@ P3 验证（Node `v24.22.1` / pnpm `10.34.9`）：
 - 本地脚本、配置和证据位于 Git/Docker 已忽略的 `config/p3-baseline/`，密码/认证密钥/Cookie 仅在内存。未下载浏览器或新增 E2E 依赖。
 - 主动检查 17 个文件：9 个 clean；4 个文件保留 13 条既有 advisory（QuickLaunch/首页静态建议及翻译中已有 widget ID 的拼写提示）；4 份文档无语言服务答复（inconclusive），未计为 LSP 通过。另有 1 项 QuickLaunch 既有 window.open 启动器的 no-open-redirect 规则例外：这是用户主动外链导航，不是认证重定向，新备用 URL 仍严格校验；逐调用点保留说明/忽略，不关闭整个规则，不把该位置计为检测器 clean。代码 Prettier、Python py_compile、JSON/文档静态及 git diff --check 通过。
 
-未完成：真实中键/Ctrl-Cmd/原生右键、窄屏/触屏、真实跨标签页、反代/CDN、OIDC 验收；P4 菜单及 P5/P6，P0 外部设置仍待授权。当前环境没有浏览器可执行程序；P3 代码/自动化完成不代表 v1 完成。本轮未进入 P4，未提交推送、未发布部署。
+未完成：真实中键/Ctrl-Cmd/原生右键、窄屏/触屏、真实跨标签页、反代/CDN、OIDC 验收；P4 菜单及 P5/P6，P0 外部设置仍待授权。当前环境没有浏览器可执行程序；P3 代码/自动化完成不代表 v1 完成。P3 结束时未进入 P4、未提交推送、未发布部署；后续提交与 P4 状态以上方记录为准。
 
 ### P2 Provider 与偏好恢复记录（历史）
 
@@ -128,7 +150,7 @@ P0 实际验证：
 
 本轮文档校验：5 个文件的相互链接、已存在源码路径引用、结尾换行、尾部空白与代码围栏检查通过；4 段 YAML 及全部 JSON 示例解析通过。对 5 个 Markdown 文件的主动 LSP 检查均未得到语言服务有效答复，结果为 inconclusive，不能记为静态诊断通过。
 
-初始交付时所有新增字段均待实现；目前 P1～P3 已提供解析、响应过滤、偏好、切换器及卡片/搜索联动，服务菜单仍待 P4，完整验收仍待后续阶段。
+初始交付时所有新增字段均待实现；目前 P1～P4 已提供解析、响应过滤、偏好、切换器、卡片/搜索联动及菜单，完整浏览器/安全与发布验收仍待后续阶段。
 
 ## 初始核查快照（2026-11-05）
 
@@ -143,13 +165,13 @@ P0 实际验证：
 
 ## 建议下一步
 
-P3 代码及自动化已完成；下一步经用户确认进入 **P4：服务菜单与无障碍**，并安排可用浏览器环境补齐 P3 的真实导航/布局验收：
+P4 代码/自动化已完成；下一步经用户确认进入 **P5：安全、兼容与使用文档**：
 
-1. 菜单只在可扩展且 ready 的服务导航区接管右键，不能拦截 Widget/统计，保留 Shift+右键原生回退。
-2. 可见更多按钮、Portal/边缘定位、单菜单互斥、外部点击/Escape/滚动/模式变更关闭及焦点恢复。
-3. 使用已有 getServiceAddressOptions 候选与 getServiceNavigation 状态，临时地址链接不改全局模式；复制失败提示不能假成功。
+1. 先安排/授权可用浏览器环境，补齐 P3/P4 原生链接、右键、触屏/菜单边缘布局、键盘/焦点、剪贴板权限和多标签页的实际验收，记录浏览器版本、分辨率、配置与结果。
+2. 完成受控实例的登录/退出、SSR/Next 数据/API 与 HTTPS/反代/CDN 缓存验收；不要把 localhost 私有响应头当成真实反代证明。
+3. 补充正式使用说明与兼容/安全限制，逐条核对 SPEC 完成定义，不提前部署或发布；浏览器/E2E 依赖引入需另行评估授权。
 
-内部约定：default 的 `label: null` 用 i18n；候选为 `{ id, label, href, current }`，fallback 说明取解析结果。getServiceSearchEntry 必须每次接收原始服务，不能对已覆盖 href 的派生项再次解析。
+内部约定：default 的 `label: null` 用 i18n；候选为 `{ id, label, href, current }`，fallback 说明取解析结果。菜单状态只在当前 NetworkProvider 内，不读写偏好；新菜单使用记录身份隔离旧关闭任务/复制结果。getServiceSearchEntry 始终接收原始服务。
 
 P0 外部仓库设置仍单独待授权；不能将本地旧 `origin/HEAD -> origin/dev` 当成 GitHub 实时默认分支。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
 
