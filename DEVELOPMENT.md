@@ -33,37 +33,44 @@ command -v corepack || true
 
 不要执行 `git reset --hard`、`git clean -fd`、强推、删除其他人的分支或自动隐藏用户改动。发现工作区有变更，先读取差异并保留。
 
-## 3. 基础配置待办
+## 3. 基础配置与 P0 外部记录
 
-这些动作尚未执行，配置远程/仓库设置前需明确操作范围。
+2026-11-06 已按用户明确确认的“main＋基础保护”完成下述基础设置；必需 CI 检查名的绑定留待 P6，不冒充已经完成的 CI 门禁。
 
-### 3.1 添加官方 upstream
+### 3.1 官方 upstream（已完成）
 
-确认不存在同名 remote 后：
+已核查无同名 remote 后执行：
 
 ```bash
-git remote add upstream https://github.com/gethomepage/homepage.git
-git fetch upstream main
+git remote add -t main upstream https://github.com/gethomepage/homepage.git
+git fetch --no-tags upstream main
+git remote set-head upstream main
 ```
 
-若 remote 已存在，先检查 URL，不盲目覆盖；`origin` 必须保留为用户 Fork。
+结果：fetch refspec 仅 `+refs/heads/main:refs/remotes/upstream/main`，来源为 `2e5f10134ae3961bb936d3e7c441f9a1f4a4bf4f`（v2.7.0），与原基线相同。官方 GitHub 默认仍是 dev，但本项目明确选其 main 稳定来源，不跟随开发默认分支。
 
-### 3.2 GitHub 默认分支与保护
+上述不是要求未来重复添加 remote；已存在时先检查 URL，不盲目覆盖。origin 保留用户 Fork，本地 main/功能分支仍跟踪 origin；没有 checkout、merge、rebase 或移动分支。
 
-用户在 GitHub Fork 的设置里将默认分支设为 `main`。更改后本地可刷新：
+### 3.2 GitHub 默认分支与基础保护（已完成）
+
+2026-11-06 先用 REST API 与 Git 传输核查 Fork `kanon-H/homepage` 实际默认为 dev、main 未保护且无 ruleset，再按用户确认改为 main 并创建基础保护。重新读取 API 及 `git ls-remote --symref origin HEAD` 均确认 main；随后执行：
 
 ```bash
 git remote set-head origin -a
 ```
 
-该命令只刷新本地引用，不会改变 GitHub 默认分支。不要将本地 `origin/HEAD` 的旧值误判成服务器当前设置，必要时联网重新核实。
+该命令只刷新本地引用，不会改变 GitHub 网站设置；本次网站设置由 API 单独完成并核实。本地 origin/HEAD 已为 origin/main，upstream/HEAD 明确选 upstream/main，旧 dev 引用仅保留为历史，不代表当前 Fork 默认分支。
 
-建议保护 `main`：
+main 当前基础保护：
 
-- 通过 PR 合并，CI 为必需检查。
-- 禁止强制推送和随意删除。
-- 普通功能 PR 可以 squash；**上游集成 PR 必须保留上游提交祖先关系，使用 merge commit，不 squash。**
-- 分支策略、可用规则和权限以 GitHub 实际账号能力为准。
+- 必须通过 PR；required approvals=0，个人可合并自己的 PR，不强制找第二人审批。
+- enforce_admins=true，管理员也受约束；allow_force_pushes=false、allow_deletions=false。
+- required_linear_history=false，allow_merge_commit=true，允许保留合并历史。仓库 squash/rebase 开关保留原值；**上游集成 PR 必须使用 merge commit、不 squash**，不是看到开关允许就随意选择。
+- **CI 尚待 P6**：required_status_checks=null，是用户确认的阶段安排，不绑定不存在或未经验证的检查名。最终要求仍是建立可信 CI 后作为必需检查，并实际验证合并门禁；不能把基础保护叫作完整 CI 保护。
+
+初次 PATCH 返回 HTTP 500 后，先重新用 API/传输确认仍 dev/未保护再重试；成功响应均 200，之后再读取验证策略。GitHub TLS 偶发握手中断均保留证据、使用原请求重试，没有关闭证书校验。现有认证凭据只在内存用于已授权的 Fork API，不打印/落盘；脱敏审计位于被 Git/Docker 忽略的 `config/p0-external/evidence/`。
+
+P0 元数据配置时没有移动任何分支提交：main/origin/main/upstream/main 均保持 `2e5f1013`；二开当时在 feature/multi-address 的 `d5ade7b6`，尚未通过 PR 合入 main。后续 P0 交接文档提交不等于合入 main。GitHub 设置变更不是代码合并、CI 运行或发布/部署。
 
 ### 3.3 工具版本
 
@@ -116,12 +123,12 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线、P1～P4 功能、P5 自动化与文档已完成；P5 手工/目标环境验收、P0 外部仓库设置和 P6 仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
+P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题和 P6（含必需 CI 绑定）仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
 
 ### P0：建立可信开发基线
 
 - [x] 核查分支/remote/工作区，确认用户允许的改动范围。
-- [ ] 配置 upstream、确认 GitHub 默认 main；记录是否由用户完成。**本次未授权远程/GitHub 设置操作，保留为外部待办。**
+- [x] 配置 upstream 仅跟踪官方 main；2026-11-06 用户另行授权并确认 main＋基础保护，Fork 默认 main/PR 基础保护与本地 HEAD 引用均已核实，详见第 3 节；CI 检查名绑定待 P6。
 - [x] 在功能分支 `feature/multi-address` 开发；P0 时 HEAD 为 `2e5f1013`，随后文档按用户要求提交并推送为 `dd145355`。
 - [x] 安装锁文件依赖，记录 Node `v24.22.1` / pnpm `10.34.9`，package.json 与锁文件无变化。
 - [x] 在未改功能前运行 Lint、Vitest、生产构建，记录上游已有失败。
@@ -143,7 +150,7 @@ Vitest 有两条既有嵌套 `vi.unmock` 提升警告，位于 `src/utils/proxy/
 
 复现入口与虚构 YAML 位于被 Git/Docker 忽略的 `config/p0-baseline/`。脚本使用 Python 标准库，在内存生成随机密码、认证密钥并维护 Cookie；凭据不落盘。日志留在 `/tmp/homepage-p0-{install,lint,test,build,smoke,server}.log`，副本保存于 `config/p0-baseline/evidence/`。脚本复制 public/static 到 standalone，临时服务只监听 `127.0.0.1:3307` 并在结束时停止，不是生产部署。该本地目录不会随 Git 分发，未来 CI 不能依赖其存在。
 
-本次没有真实浏览器可执行程序，未做浏览器渲染/交互、OIDC、HTTPS 或反向代理/CDN 验收；HTTP 响应头通过不等于反代缓存验收通过。P0 外部设置未完成，本地基线已建立，可在用户确认后进入 P1。
+初次 P0 当时没有真实浏览器可执行程序，未做浏览器渲染/交互、OIDC、HTTPS 或反代/CDN；HTTP 响应头通过不等于反代缓存验收。外部设置当时未完成，后于 2026-11-06 按第 3 节用户方案补齐基础配置；后续功能/验收证据分别见 P1～P5，不伪装成初次基线的结果。
 
 验收：已能区分“上游已有问题”“环境问题”和“新增回归”；无密钥进 Git。
 
@@ -337,6 +344,7 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 ### P6：专用 CI/CD 与上游集成
 
 - [ ] 自有 PR 测试工作流，精确工具版本、frozen lockfile。
+- [ ] CI 实际运行验证后，将真实检查名绑定 main 的必需检查并验证门禁；P0 的 required_status_checks=null 尚未完成本项。
 - [ ] 上游 main 定期集成 PR，保留历史、冲突停止并通知。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。

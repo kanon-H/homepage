@@ -24,9 +24,22 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：P5 自动化与使用文档已完成，人工/目标环境验收待补
+## 当前状态：P0 基础外部设置已补齐；P5 排查暂停，P6 未开始
 
-当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`；本次 P5 提交前基线为 `808af4fa9e82a16a796d49fad9bd2fdc8fd24cfa`（P4 已提交推送）。2026-11-05 用户另行明确授权将本轮 P5 脚本、使用说明及交接摘要提交并推送到该功能分支；具体提交结果以 Git log 和远程引用为准。本次授权不包含恢复已暂停的手机兼容排查、P6、发布或生产部署，本地 config/凭据/证据不提交。
+当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`，本轮 P0 文档提交前 HEAD 为 `d5ade7b6191a81cac023a41fc055c3713a75b2b5`，P5 脚本/文档已按上轮授权提交并推送。本轮 2026-11-06 用户另行授权补 P0，并确认“main＋基础保护”；P0 配置阶段仅操作 Git/GitHub 元数据及更新交接。用户随后明确授权提交现有成果，本次仅将三份 P0 交接文档提交/推送当前功能分支，结果以 Git log 和远程引用为准；不合入 main，不恢复 P5 排查、不开始 P6、不发布或生产部署。
+
+### 2026-11-06 P0 基础外部设置（已验证）
+
+- 新增官方 `upstream=https://github.com/gethomepage/homepage.git`，fetch refspec 仅 `main`；已 `fetch --no-tags upstream main`，得到 `2e5f10134ae3961bb936d3e7c441f9a1f4a4bf4f`（v2.7.0，与原基线相同）。没有 checkout、merge、rebase 或更新本地 main。origin 与两个本地分支的跟踪关系保留不变。
+- 官方 GitHub 当前默认仍是 dev；我们明确选择稳定 main 作来源，本地 upstream/HEAD 指向 upstream/main，不将官方默认分支误当成需要跟踪的开发分支。
+- Fork `kanon-H/homepage` 的 GitHub 默认分支从 dev 改为 main；REST API 与 `git ls-remote --symref origin HEAD` 均确认 main。本地 origin/HEAD 已刷新为 origin/main。
+- main 基础保护已由 API 重新读取确认：必须 PR、required approvals=0（个人可自行合并）、enforce_admins=true、禁止强推/删除、不要求线性历史；allow_merge_commit 仍 true，squash/rebase 仓库开关保留原值。未执行任何 PR 合并。
+- **必需 CI 检查尚未绑定**（required_status_checks=null），这是用户确认的阶段安排：P6 先建立并验证 CI，再绑定实际检查名，不伪造检查或把基础保护当作完整 CI 门禁。
+- P0 配置时 main/origin/main/upstream/main 保持 `2e5f1013`，二开位于 feature 分支 `d5ade7b6`；后续 P0 文档提交不等于把二开合入 main。
+- 复用现有仓库 Git 凭据，仅在内存使用 API 认证，无新凭据或安装工具。初次 GitHub PATCH 返回 500；先用 API/传输确认仍是 dev/未保护，再原样重试成功，未盲目覆盖现有规则。脱敏审计在 Git/Docker 忽略的 `config/p0-external/evidence/`，不提交凭据或原始配置。
+- 上轮手工测试实例已按原期限自动停止（status=expired，监听已消失）；未重启/续期，手机兼容排查继续暂停。
+
+### P5 已交付与未完成记录
 
 2026-11-05 人工验收实例已启动：用户明确选择局域网直连；复用现有 standalone，仅绑定所选内网 IPv4 与独立端口，启用随机临时密码/认证密钥及严格 Host 校验，使用独立虚构服务/书签配置，不动生产服务、系统防火墙或代理。地址、PID 和到期状态仅在 Git/Docker 忽略的 `config/p5-manual/session-20261105T215005-0e6ff5/status.json`，不在本文记录真实地址或凭据。两小时 watchdog 到 UTC+8 23:50:05 自动停止；本机 HTTP 已验证匿名隔离、原生登录/退出、PNG 图标、配置校验、private/no-store 和非法 Host 拒绝，用户已确认客户端可打开并登录，8 项基础桌面操作正常，详细结果见下方；其余未覆盖人工场景仍待。停止时向该 status.json 中的 supervisor PID 发 SIGTERM 前须再次核对进程身份，不杀其他服务；临时密码不落配置/日志。
 
@@ -46,7 +59,7 @@
 
 物理手机补充：用户确认两机手机步骤 1～4 基础触屏/布局正常；华为手机/华为浏览器/鸿蒙6 报告新标签页打开，红米/小米浏览器报告替换当前页，用户偏好新标签页。手机具体型号、华为/QQ 浏览器及红米系统版本未提供；小米版本和触发动作的后续确认见下文，窗口差异为未解决项，不记全通过。已核查原版支持全局/服务 target；现有测试配置为全局 `_blank` 且服务无覆盖，live Chromium149触屏模拟中标题/图标/菜单真实链接也均为 `_blank`，更多按钮不导航、地址激活新页面。证据在该 session 的 `link-target-probe.json`，不是物理小米浏览器复现，不能据此断言根因。用户随后已明确：红米更多按钮只正常展开菜单，菜单地址激活才替换当前页，直接点标题也替换当前页。同页行为不是菜单专有，更倾向浏览器统一链接策略/兼容性，已获小米版本 `v20.28.1020918`，用户补测红米与鸿蒙手机的 QQ 浏览器也报告原页打开，不能仅归因于红米系统；QQ 版本/客户端设置尚未核查。用户已通过标签列表确认数量不变且 Homepage 被替换，已排除新标签切前台的误判；具体原因未确认。下一步拟准备受原登录保护的临时纯 HTML 链接对照（比较 `_blank` 与 rel 组合，不含业务菜单逻辑），但用户已选择暂停排查，不创建对照页、不修改业务代码、不重启/续期，临时实例按原定 UTC+8 23:50:05 自动停止；恢复时先确认测试环境与授权；不先写强制 window.open、移除 rel 或关闭浏览器安全保护的补丁。
 
-仍未完成：红米链接打开方式差异、手工中键、完整键盘焦点/Widget统计交互等未覆盖场景、物理触屏剩余项目、实际 OIDC（如使用）及目标生产反代/CDN 验收。无头 Chromium/本地 nginx 不代替这些证据，SPEC 完成定义仍未全部满足，P5 完整验收及 v1 不能宣称完成。P6 和 P0 外部仓库设置未执行；本次仅按用户授权提交/推送 P5 已完成成果，不表示完整验收通过，未发布或生产部署。
+仍未完成：红米链接打开方式差异、手工中键、完整键盘焦点/Widget统计交互等未覆盖场景、物理触屏剩余项目、实际 OIDC（如使用）及目标生产反代/CDN 验收。无头 Chromium/本地 nginx 不代替这些证据，SPEC 完成定义仍未全部满足，P5 完整验收及 v1 不能宣称完成。P0 基础外部设置已按上方补齐，必需 CI 绑定仍待 P6；P6 未执行，P5 完整验收未完成。上轮只提交/推送 P5 已完成成果，本轮 P0 交接已获随后明确提交/推送授权，未发布或生产部署。
 
 ### P4 服务菜单记录（历史）
 
@@ -189,7 +202,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-P5 自动化与文档已完成，下一步最小任务是补齐 **P5 人工/目标环境验收**，不是自动进入 P6：
+P0 基础外部已补齐，P5 手机排查按用户选择暂停，不自动恢复；P6 尚未授权开始。以下 P5 路线仅供用户选择恢复时使用，若用户授权 P6，则先建立真实 CI 并绑定 main 保护，再分别处理上游同步/发布：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
@@ -197,7 +210,7 @@ P5 自动化与文档已完成，下一步最小任务是补齐 **P5 人工/目�
 
 内部约定：default 的 `label: null` 用 i18n；候选为 `{ id, label, href, current }`，fallback 说明取解析结果。菜单状态只在当前 NetworkProvider 内，不读写偏好；新菜单使用记录身份隔离旧关闭任务/复制结果。getServiceSearchEntry 始终接收原始服务。
 
-P0 外部仓库设置仍单独待授权；不能将本地旧 `origin/HEAD -> origin/dev` 当成 GitHub 实时默认分支。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
+P0 基础外部设置已按本轮授权完成；GitHub 默认 main 和本地 origin/HEAD→origin/main 均已验证，初始 dev 快照仅是历史。CI 必需检查绑定在 P6 完成前仍是待办，不能因 main 已有基础保护就假定 CI 已生效。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
 
 ## 容易踩坑的关键点
 

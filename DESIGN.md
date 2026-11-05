@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P1～P4 功能及 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成，P6 未执行，不表示扩展整体已验收。
+> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成，P6 未执行，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -354,7 +354,7 @@ gethomepage/homepage main
 
 ## 11. 当前交付状态
 
-当前分支 `feature/multi-address`，P4 已按用户要求提交推送为 `808af4fa`。2026-11-05 用户授权继续 P5 及隔离下载测试工具；P5 自动化与文档完成，用户现另行授权提交/推送这些成果（不代表完整验收完成）：
+当前分支 `feature/multi-address`，P4/P5 已按用户要求分别提交推送为 `808af4fa` / `d5ade7b6`。2026-11-06 又按用户确认的“main＋基础保护”补齐 P0 基础外部设置；P5 完整验收与 P6 仍未完成：
 
 - 新增可选 `scripts/network-acceptance.py`；独立虚构配置、standalone、Widget/监控后端、临时 TLS 和真实 nginx 缓存均仅在 loopback，正常/异常退出清理。不依赖仓库外参考项目，不操作系统服务或 nginx-ui，不新增项目依赖声明。
 - Chromium `149.0.7827.55` + Python Playwright `1.61.0` + nginx `1.26.3` 四配置及普通 HTTP 场景共 245 项检查通过；卡片/菜单的中键与 Linux Ctrl-click、trusted 右键范围、真实焦点/剪贴板权限、多标签页/搜索同步及视口测量不再仅靠 jsdom。移动 390×844 使用触屏模拟，320×240 验证短视口/长菜单；截图为虚构数据。
@@ -363,4 +363,5 @@ gethomepage/homepage main
 - Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、583 文件 / 2229 测试与生产构建通过。使用说明见 [多地址导航](docs/configs/network.md)，完整命令/分层证据见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 - 用户已在 macOS 电脑 / Chrome `155.0.8059.85`、Edge `154.0.4258.37`（均正式版 arm64）确认 8 项基础桌面操作正常，包含 Cmd、原生右键/Shift、上下键/Escape、缩窄布局及 HTTP 复制失败。手工中键因无该按钮而未执行，OS 具体版本/viewport 未提供；完整键盘焦点、Widget统计、物理触屏、OIDC（如使用）及目标反代/CDN 仍需补验。自动化不替代 SPEC 的手工完成定义，P5 完整验收及 v1 尚未完成。
 - 物理手机基础触屏/布局已有用户反馈；华为浏览器报告新标签，红米小米浏览器 `v20.28.1020918`、红米/鸿蒙手机 QQ 报告原页打开。用户以标签数不变确认真实替换；配置及 live Chromium 探针仍为 `_blank`，不能仅归因于 OS 或设置。用户已暂停排查，不添加未经验证的强制导航补丁，不将该差异记为通过。
-- P0 外部设置、P6、发布/部署未执行；没有修改远程、系统包、依赖/锁文件或 Actions。最新交接见 [agent.md](agent.md)。
+- P0 基础外部已完成：新增官方 upstream 仅跟踪 main，来源 `2e5f1013` 与基线相同；Fork 默认改 main，本地 origin/HEAD 同步；main 要求 PR、零强制审批、管理员受约束、禁止强推/删除，保留 merge commit。官方默认仍 dev，不影响明确使用其 main 来源。没有合并或移动分支代码，二开仍在功能分支。
+- 必需 CI 检查尚未绑定，用户确认由 P6 建立并验证实际 CI 后绑定；不是已完成的 CI 门禁。P6、发布/生产部署未执行；本轮只有 Git/GitHub 元数据及交接文档变更，无业务/系统包/依赖/锁文件/Actions 改动。P0 交接文档现按用户随后明确授权提交/推送功能分支，最新状态见 [agent.md](agent.md)。
