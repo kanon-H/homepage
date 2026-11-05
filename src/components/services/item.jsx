@@ -9,13 +9,16 @@ import Status from "./status";
 import Widget from "./widget";
 
 import ResolvedIcon from "components/resolvedicon";
+import { useNetwork } from "utils/contexts/network";
 import { SettingsContext } from "utils/contexts/settings";
+import { getServiceNavigation } from "utils/network/navigation";
 import Docker from "widgets/docker/component";
 import Kubernetes from "widgets/kubernetes/component";
 import ProxmoxVM from "widgets/proxmoxvm/component";
 
 export default function Item({ service, groupName, useEqualHeights }) {
-  const hasLink = service.href && service.href !== "#";
+  const network = useNetwork();
+  const { href, hasLink } = getServiceNavigation(service, network);
   const { settings } = useContext(SettingsContext);
   const showStats = service.showStats === false ? false : settings.showStats;
   const statusStyle = service.statusStyle !== undefined ? service.statusStyle : settings.statusStyle;
@@ -51,7 +54,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
           {service.icon &&
             (hasLink ? (
               <a
-                href={service.href}
+                href={href}
                 target={service.target ?? settings.target ?? "_blank"}
                 rel="noreferrer"
                 className="shrink-0 flex items-center justify-center w-12 service-icon z-10"
@@ -67,7 +70,7 @@ export default function Item({ service, groupName, useEqualHeights }) {
 
           {hasLink ? (
             <a
-              href={service.href}
+              href={href}
               target={service.target ?? settings.target ?? "_blank"}
               rel="noreferrer"
               className="flex-1 flex items-center justify-between rounded-r-md service-title-text"

@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P0 本地基线、P1 配置/解析/响应过滤、P2 Provider/偏好恢复已验证；多地址 UI 尚未实现。本文区分现有模块与后续设计，不表示扩展整体已验收。
+> 状态：P0～P2 已验证；P3 切换器、真实卡片/搜索链接已实现并通过自动化，真实浏览器验收和 P4 菜单尚未完成。本文区分现有模块与后续设计，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -64,8 +64,8 @@ config/services.yaml
   → servicesFromConfig() / parseServicesToGroups()
   → servicesResponse() / cleanServiceGroups()
   → SSR fallback + /api/services
-  → ServicesGroup / Item
-  → 图标与标题 <a href={service.href}>
+  → ServicesGroup / Item → getServiceNavigation(原始 service, network)
+  → ready 后的图标与标题 <a href={当前有效 href}>（恢复前仅抑制可扩展服务）
 ```
 
 相关代码：
@@ -113,7 +113,7 @@ config/services.yaml
 使用可选的 `extensions.network` 命名空间，不新增 `lanUrl`、`wanUrl` 等固定二元字段。
 
 ```yaml
-# settings.yaml：P1/P2 已支持解析和偏好状态；切换器待 P3
+# settings.yaml：P1～P3 已支持解析、偏好和切换器；真实浏览器验收待完成
 extensions:
   network:
     enabled: true
@@ -130,7 +130,7 @@ extensions:
 ```
 
 ```yaml
-# services.yaml：P1 已支持地址校验/过滤；卡片链接联动待 P3
+# services.yaml：P1 校验/过滤、P3 卡片与搜索联动已实现；服务菜单待 P4
 - 基础设施:
     - NAS:
         href: https://nas.example.com
@@ -157,7 +157,7 @@ v1 采用现有 YAML，不增加服务配置文件。保留未知的其他扩展
 
 ## 5. 核心架构
 
-### 5.1 模块布局（P1/P2 已实现部分与后续计划）
+### 5.1 模块布局（P1～P3 已实现部分与后续计划）
 
 为沿用现有 alias，不额外增加 `extensions` 路径别名。逻辑仍独立，只通过少量接入点集成：
 
@@ -165,6 +165,7 @@ v1 采用现有 YAML，不增加服务配置文件。保留未知的其他扩展
 src/utils/network/
   config.js                 # 配置规范化、地址过滤、诊断结果，纯函数
   resolver.js               # 解析某模式地址、构造菜单项目，纯函数
+  navigation.js             # P3 独立的 UI ready 适配与服务搜索派生，纯函数
   server.js                 # P1 服务响应过滤入口与去重脱敏日志，服务端专用
   storage.js                # 带异常保护的偏好读写，浏览器适配层
   *.test.js
@@ -176,7 +177,7 @@ src/components/network/
   *.test.jsx
 ```
 
-P1 已实现 config.js、resolver.js、server.js 及纯逻辑/响应集成测试；P2 已实现 storage.js、contexts/network.jsx 及存储/Provider/首页接入测试；network UI 组件仍未实现。接口职责不能散落：
+P1 已实现 config.js、resolver.js、server.js 及纯逻辑/响应集成测试；P2 已实现 storage.js、contexts/network.jsx 及测试；P3 已实现 navigation.js、mode-switcher.jsx 和卡片/搜索/页面接入及测试。service-menu.jsx 仍待 P4。接口职责不能散落：
 
 ```text
 normalizeNetworkSettings(rawSettings)
@@ -201,7 +202,7 @@ P1 内部接口补充：
 - 内置 default 未指定标签时，规范化值为 `{ id: "default", label: null }`，后续 UI 用 i18n 显示，纯函数不依赖语言环境；显式合法标签保留。
 - 菜单候选返回 `{ id, label, href, current }[]`，仅可扩展服务有候选；按模式 ID 标记当前来源而非按 URL 去重，fallback 提示取解析结果。临时菜单打开不会变更模式。
 - 服务诊断使用分组/服务/地址的索引路径及原因码，不输出原始名称、地址键、ID 或 URL（这些值可能被误填为秘密）；地址索引对应原映射中的枚举顺序。
-- ready 抑制不属于纯函数；P2 已提供状态信号，P3/P4 真实导航组件未接入前，页面仍按上游 href 导航。
+- 原 resolver 不处理 ready；P3 用独立的纯 UI 适配层消费 P2 状态，不把临时恢复状态写回原始服务或地址解析结果。
 
 ### 5.2 Provider 放置
 
@@ -240,7 +241,15 @@ SSR 初始设置和完整服务列表（与模式无关）
 
 不得将浏览器模式写入 `getDashboardData` 的进程缓存、SWR 的原始服务对象、全局模块变量或 YAML。多浏览器并发使用时，各自模式互不影响。
 
-QuickLaunch 推荐在首页构造不可变的派生服务条目，然后和未改动的书签条目合并。只对服务执行解析，不对“访问 URL”、搜索建议、搜索引擎链接套用模式解析。保留原条目的 `type`、名称、target 等字段；若临时覆盖派生对象的 `href`，原对象必须保持不变且原始默认地址来源清晰。
+P3 已在首页构造不可变的派生服务条目，然后和未改动的书签条目合并。只对服务执行解析，不对“访问 URL”、搜索建议、搜索引擎链接套用模式解析。保留原条目的 `type`、名称、target 等字段，临时覆盖副本的 `href`；每次派生都来自 SWR 的原始服务，不能再次解析已经覆盖 href 的副本。
+
+P3 内部接口和接入：
+
+- `getServiceNavigation(service, { settings, mode, ready })` 调用 P1 resolver 与地址资格校验，返回解析结果及 eligible/pending；只有 eligible 且未 ready 才输出无 href、hasLink false。该函数不访问浏览器或写入输入。
+- `getServiceSearchEntry(service, network)`：可扩展服务返回覆有有效 href（恢复时 undefined）的副本；普通/禁用服务返回原条目。首页先按原始 href 筛选再派生，因此恢复中的服务保留搜索位置，无默认地址误开，也不把原本无 href 的服务变成搜索入口。
+- QuickLaunch 无 href 的结果按钮禁用，点击/Enter 的共同打开函数再次拒绝无 href/失效索引；拒绝时不关闭、不排队。已打开搜索随模式或 storage 事件更新，原生书签/搜索提供商/输入 URL 处理与 target 优先级不变。
+- 服务卡片只替换图标/标题 href 的来源，沿用真实 anchor、原 target/rel，不加跳转 onClick，不影响 Widget 或统计节点。
+- 新增三项文案只写 en/zh-Hans；默认模式无显式 label 时翻译，用户 label 直接当文本。QuickLaunch 既有用户主动 window.open 是外部导航功能，不是认证重定向；静态 no-open-redirect 在此单点记录例外，新备用地址的校验仍在 P1 执行。
 
 ### 5.4 SSR、恢复与首次点击
 
@@ -256,7 +265,7 @@ QuickLaunch 推荐在首页构造不可变的派生服务条目，然后和未�
 
 组件状态、统计按钮、Widget 正常工作，不应因为短暂恢复而卸载整张卡片。
 
-P2 已通过 renderToString/hydrateRoot、StrictMode 和存储故障的 jsdom 测试提供 ready 合同，但真实图标/标题/搜索/菜单的恢复抑制要在 P3/P4 完成；当前没有借测试探针宣称真实 UI 验收通过。
+P2 已提供 ready 合同；P3 已在真实图标/标题及搜索打开入口实施恢复抑制，并用真实卡片 renderToString/hydrateRoot 验证未出现默认 href。菜单抑制待 P4；这里的组件和生产 SSR 验证不等于真实浏览器的中键/原生右键/手机验收。
 
 ## 6. UI 与交互
 
@@ -264,7 +273,7 @@ P2 已通过 renderToString/hydrateRoot、StrictMode 和存储故障的 jsdom �
 
 放在首页顶部信息区的右侧，不能误放在当前上游 footer 的主题切换区。没有信息 Widget 时仍要显示；手机布局换行但保持可访问，不遮住搜索入口。
 
-只在扩展启用且存在备用模式时显示；模式切换后更新所有服务入口。缺少某模式地址时，服务回退 `href`，菜单中说明“当前使用默认地址”，不做可达性探测。
+P3 使用原生 label/select，只在扩展启用且存在备用模式时显示；恢复期间禁用，切换后立即更新卡片与搜索。右侧容器不再依赖 widgets 是否返回，select 限宽且父级可换行，避免长标签撑宽；实际手机/触屏布局仍待浏览器验收。缺少某模式地址时回退原始 `href`；菜单中的 fallback 说明待 P4，不做可达性探测。
 
 ### 6.2 服务菜单
 
@@ -337,11 +346,11 @@ gethomepage/homepage main
 
 ## 11. 当前交付状态
 
-当前分支 `feature/multi-address`，初始规划/P0 文档及 P1 已按用户要求提交推送，HEAD 为 `b584b902`。2026-11-05 已完成 P2，本轮尚未提交：
+当前分支 `feature/multi-address`，P2 已按用户要求提交推送，HEAD 为 `73d36b37`。2026-11-05 P3 代码与自动化已完成，本轮尚未提交：
 
-- 新增安全偏好存储适配、每个 Provider 独立的模式状态和恢复/同步/配置变更合同；首页只增加导入及围绕 Index 的页面级 Provider，传入真实 initialSettings。
-- P1 配置规范化/响应过滤不变；不修改原始 href、共享缓存、Widget 或监控目标。尚无模式切换器、卡片/搜索联动或菜单 UI。
-- Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、579 个测试文件 / 2142 项测试及带虚构多地址配置的生产构建通过。
-- SSR/hydration 首帧、StrictMode 和存储异常通过 jsdom 验证；复用临时 loopback standalone HTTP 回归，结束已停止。未验证真实浏览器跨标签页、触屏、OIDC 或反代缓存。
-- 没有修改依赖声明、锁文件、认证、Widget 白名单、远程设置或 Actions，没有发布部署。
-- P0 的 upstream/GitHub 设置仍待单独授权；下一步经用户确认后进入 P3。完整证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。
+- 顶部模式切换器、卡片图标/标题真实链接、服务搜索不可变派生和 ready 保护已接入；普通服务/书签保持原行为，菜单尚待 P4。
+- P1/P2 核心及服务器共享数据不变；不修改 Widget/监控目标、认证、依赖/锁文件、远程设置或 Actions。
+- Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、581 个测试文件 / 2180 项测试及生产构建通过；新模块覆盖率行/分支/函数 100%。
+- 卡片真实 SSR/hydration、搜索 click/Enter/存储事件、无 Widget 顶部与文案回退通过自动化。生产 enabled/disabled/legacy 三配置 standalone SSR/认证回归通过，临时实例均已停止。
+- 没有真实浏览器可执行程序，未完成原生中键/Ctrl-Cmd/右键、窄屏/触屏、真实多标签页、OIDC 或反代缓存验收；不宣称完整 v1 完成。
+- P0 外部设置仍待授权；下一步安排浏览器补验，P4 需用户确认后开始。没有发布部署，证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。

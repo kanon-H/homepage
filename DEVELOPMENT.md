@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P0 本地基线、P1 配置/解析/响应过滤、P2 Provider/偏好恢复已验证，尚无多地址 UI。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
+> 当前状态：P0～P2 已验证；P3 切换器、真实链接和搜索联动已实现并通过自动化，真实浏览器导航/手机布局验收仍待完成。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
 
 ## 1. 阅读顺序
 
@@ -116,7 +116,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线及 P1/P2 已完成，外部仓库设置待单独授权；P3～P6 均未实现。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
+P0 本地基线及 P1/P2 已完成，P3 代码与自动化已完成但真实浏览器验收待做；外部仓库设置待授权，P4～P6 未实现。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
 
 ### P0：建立可信开发基线
 
@@ -204,20 +204,47 @@ Vitest 有两条既有嵌套 `vi.unmock` 提升警告，位于 `src/utils/proxy/
 
 本轮日志为 `/tmp/homepage-p2-{install,focused,coverage,lint,test,build,smoke,server}.log`，证据副本在 Git/Docker 忽略的 `config/p2-baseline/evidence/`。HTTP 回归复用 p1-baseline 的配置和脚本，因此日志 PASS 文案仍带 P1 字样；构建/服务日志从该脚本原路径复制为 P2 证据，未覆盖已归档的 P1 证据。本轮没有单独新增 Python 脚本。
 
-没有真实浏览器跨标签页、触屏、OIDC、HTTPS 或反代/CDN 验收；本阶段测试仅保证网络扩展的存储容错，未改动上游 Theme/Color 等自身的存储代码，全页禁用存储的浏览器兼容性仍需后续核查。UI 仍使用上游原始 href，偏好尚不改变真实导航。当前 P2 未提交/推送，未进入 P3。
+没有真实浏览器跨标签页、触屏、OIDC、HTTPS 或反代/CDN 验收；本阶段测试仅保证网络扩展的存储容错，未改动上游 Theme/Color 等自身的存储代码，全页禁用存储的浏览器兼容性仍需后续核查。UI 仍使用上游原始 href，偏好尚不改变真实导航。P2 后续已按用户要求提交/推送为 `73d36b37`；P3 状态见下一节。
 
 验收：不在 Render 读 window，不先写默认偏好，不污染共享缓存。
 
 ### P3：真实链接、模式切换与搜索联动
 
-- [ ] 卡片图标和标题使用相同解析结果；恢复前避免误开默认地址。
-- [ ] 右上方模式选择器，无 Widget 时也显示，手机可用。
-- [ ] 服务搜索结果以不可变派生条目使用当前地址。
-- [ ] 搜索面板打开后模式变更立即生效，ready 保护一致。
-- [ ] 普通书签、搜索引擎、手动 URL 不变化。
-- [ ] 新增英文和简中文案，不改模式标签语义。
+- [x] 卡片图标和标题使用相同解析结果；恢复前避免误开默认地址。
+- [x] 右上方模式选择器，无 Widget 时也显示；原生 select 可键盘访问，已实现宽度限制及换行布局。
+- [x] 服务搜索结果以不可变派生条目使用当前地址。
+- [x] 搜索面板打开后模式变更立即生效，ready 保护一致。
+- [x] 普通书签、搜索引擎、手动 URL 不变化。
+- [x] 新增英文和简中文案，不改模式标签语义。
+- [ ] 真实浏览器的中键、Ctrl/Cmd 点击、原生右键、窄屏/触屏和跨标签页验收：当前没有浏览器可执行程序，未下载或新增 E2E 依赖，不能用 jsdom 代替。
 
-验收：SPEC T07、T08、T16、T22、T26、T27、T30。
+2026-11-05 P3 已实现并自动化覆盖 SPEC T07/T08/T16/T22/T26/T27/T30 中的卡片、搜索、恢复与文案部分。菜单相关部分待 P4，T26 手机实际布局及原生导航仍未验收；不标记整个 v1 完成。
+
+实际命令使用 Node `v24.22.1` / `corepack pnpm@10.34.9`：
+
+| 检查          | 命令 / 结果                                                                                                                                                                                                                                                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 依赖          | `install --frozen-lockfile` 通过，依赖声明/锁文件无变化                                                                                                                                                                                                                                                                                                              |
+| 聚焦回归      | `exec vitest run src/utils/network src/utils/contexts/network.test.jsx src/components/network src/components/services/item.test.jsx src/components/quicklaunch.test.jsx src/__tests__/pages/index.test.jsx src/__tests__/pages/_app.test.jsx`：11 文件 / 313 测试通过                                                                                                |
+| 完整回归      | `test`：581 文件 / 2180 测试通过，比 P2 新增 38 项，105.37 秒，仅两条已有 vi.unmock 警告                                                                                                                                                                                                                                                                             |
+| Lint          | `lint` 通过                                                                                                                                                                                                                                                                                                                                                          |
+| 覆盖率        | `exec vitest run src/utils/network/navigation.test.js src/components/network src/components/services/item.test.jsx src/components/quicklaunch.test.jsx src/__tests__/pages/index.test.jsx --coverage --coverage.include='src/utils/network/navigation.js' --coverage.include='src/components/network/mode-switcher.jsx'`：81 项通过；两个新增模块行/分支/函数均 100% |
+| 生产构建/SSR  | `python3 config/p3-baseline/run-baseline.py`：构建通过；enabled / disabled / legacy 三种配置分别启动临时 standalone，原生选择器与 SSR 恢复保护、旧链接/书签/target、认证/private cache、SSR/API 原始快照一致均通过；三个实例结束停止                                                                                                                                 |
+| 文案          | 真实 i18next 资源测试 en、zh-Hans、缺失语言回退；配置标签不作为 key/HTML 解释                                                                                                                                                                                                                                                                                        |
+| 主动诊断/格式 | 17 文件：9 clean，4 文件有 13 条既有 advisory，4 文档无语言服务答复（inconclusive）；另有 1 项有说明的 no-open-redirect 单点例外，未计为 clean；代码 Prettier、Python py_compile、JSON/文档静态及 git diff --check 通过                                                                                                                                              |
+
+修改范围：新增 navigation.js / navigation.test.js、mode-switcher.jsx / mode-switcher.test.jsx，接入服务卡片、首页、QuickLaunch 并扩充其测试；只改 en / zh-Hans 的 3 个同名文案。P1/P2 核心、认证、Widget 白名单、后端连接、书签组件、依赖及 Actions 不变。
+
+实现/测试注意：
+
+- 导航适配层与原 resolver 分离；卡片和服务搜索复用同一个 ready 资格规则。搜索先筛选原始 href 后派生，恢复中的结果不消失，仅清空副本 href 并禁用按钮；打开入口显式检查 href，不自动排队、不切换原始 href。
+- 卡片测试使用真实 SSR/hydration，检查从未附上默认 href 而是直接恢复到已保存的 LAN；Widget 节点、统计展开状态和 target/rel 不被模式切换改写。
+- 新 QuickLaunch 测试在 jsdom 中沿用现有 DOM 结果定位：该环境不加载 Tailwind，原有嵌套 dialog 的结果无法由默认 role 查询取得；未为测试改动上游模态语义，未弱化既有断言。
+- 既有 window.open 外部启动器触发 no-open-redirect 静态规则：已复核其为用户主动导航（SPEC SRCH-01），不是认证回调；新增备用地址仍由 P1 严格校验。使用逐调用点 pi-lens-ignore 并保留说明，不全局关闭规则，也不以同源限制破坏旧服务/书签/用户输入 URL。该位置是有理由的规则例外，不算“检测器确认 clean”。
+
+本地脚本、虚构配置和证据位于 Git/Docker 忽略的 `config/p3-baseline/`；原日志 `/tmp/homepage-p3-{install,focused,coverage,lint,test,build,smoke}.log` 及 `server-{enabled,disabled,legacy}.log` 归档到 evidence/。临时服务只监听 `127.0.0.1:3307`，随机认证密钥/密码/Cookie 不落盘。本次生产 SSR 验证使用 HTMLParser 读取真实响应，不是浏览器水合、布局或原生点击验证。
+
+当前 P3 未提交/推送，未进入 P4、未发布部署。主动诊断中的 advisory 来自 QuickLaunch/首页既有代码，以及翻译内已有 pyload/criticals 等字段的拼写提示，未为消除提示改动上游字段。后续先安排真实浏览器环境补验，P4 是否开始需用户确认。
 
 ### P4：服务菜单与无障碍
 

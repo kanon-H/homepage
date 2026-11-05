@@ -24,9 +24,32 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：P2 Provider 与偏好恢复已完成，尚无多地址 UI
+## 当前状态：P3 链接/切换器/搜索已实现并通过自动化，真实浏览器验收待做
 
-当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`，HEAD 为 `b584b902d9f750882124a9728518c38e309f6338`。P1 已按用户要求提交并推送；本轮 P2 改动尚未提交或推送，不自动沿用前次推送授权。
+当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`，HEAD 为 `73d36b374ba165e4ad2fb51270b394702750af7e`。P2 已按用户要求提交并推送；本轮 P3 尚未提交或推送，不自动沿用前次授权。
+
+2026-11-05 P3 实际变更：
+
+- 新增 `src/utils/network/navigation.js` 及测试，作为纯 UI 导航适配层共用 P1 解析结果和 P2 ready 信号，不把恢复状态塞入原 resolver。只在有有效备用地址且未 ready 时清空派生 href；原始服务、Widget、监控数据不变。
+- 新增 `src/components/network/mode-switcher.jsx` 及测试：顶部信息区右侧的原生 select，有多个模式才显示，恢复时禁用；支持键盘、限制宽度/换行。无 Widget 或 widgets 尚未返回时仍存在；手机实际布局尚未验收。
+- 卡片图标/标题的真实 href 共用适配层，保留 service > settings > _blank 及 rel，未改成 onClick 导航；恢复时只有可扩展服务暂时不生成链接，旧服务正常，Widget 与统计不卸载。
+- 首页搜索先按原始 href 筛选服务，再生成不可变派生项，保留 type/target/名称；书签不解析网络字段。恢复中的服务结果仍占原位置但无 href，QuickLaunch 按钮禁用，点击/Enter 均不打开、不关闭面板、不排队。模式或 storage 事件更新后，已打开面板使用新地址。
+- 英文/简中文案仅新增 network.mode/default/restoring；测试使用真实 i18next 资源验证两种语言和缺失语言的英文回退，配置标签作为纯文本。
+- 未开发 P4 菜单/复制，也未改变认证、服务发现、后端地址、依赖、锁文件或 Actions。
+
+P3 验证（Node `v24.22.1` / pnpm `10.34.9`）：
+
+- frozen install、Lint、生产构建通过；聚焦 11 文件 / 313 测试、全量 581 文件 / 2180 测试通过（比 P2 新增 38 项），全量耗时 105.37 秒；仅有两条原有 vi.unmock 警告。
+- 新增导航适配/切换器覆盖率行/分支/函数均 100%；卡片真实 SSR/hydration 测试证明恢复时无默认 href、恢复后两个链接直接使用已保存模式，无 recoverable hydration 错误；不是原生中键/右键验收。
+- `python3 config/p3-baseline/run-baseline.py`：虚构配置生产构建，分别以 enabled / disabled / legacy 配置启动 loopback standalone 实例；验证无 Widget 的顶部原生选择器、SSR 恢复保护、普通服务/书签原链接、禁用后的双链接及 target、SSR/API 原始数据一致、认证和私有缓存头，全部通过，三个临时实例均已停止。
+- 本地脚本、配置和证据位于 Git/Docker 已忽略的 `config/p3-baseline/`，密码/认证密钥/Cookie 仅在内存。未下载浏览器或新增 E2E 依赖。
+- 主动检查 17 个文件：9 个 clean；4 个文件保留 13 条既有 advisory（QuickLaunch/首页静态建议及翻译中已有 widget ID 的拼写提示）；4 份文档无语言服务答复（inconclusive），未计为 LSP 通过。另有 1 项 QuickLaunch 既有 window.open 启动器的 no-open-redirect 规则例外：这是用户主动外链导航，不是认证重定向，新备用 URL 仍严格校验；逐调用点保留说明/忽略，不关闭整个规则，不把该位置计为检测器 clean。代码 Prettier、Python py_compile、JSON/文档静态及 git diff --check 通过。
+
+未完成：真实中键/Ctrl-Cmd/原生右键、窄屏/触屏、真实跨标签页、反代/CDN、OIDC 验收；P4 菜单及 P5/P6，P0 外部设置仍待授权。当前环境没有浏览器可执行程序；P3 代码/自动化完成不代表 v1 完成。本轮未进入 P4，未提交推送、未发布部署。
+
+### P2 Provider 与偏好恢复记录（历史）
+
+P2 验证时 HEAD 为 `b584b902`，随后源码与文档已按用户要求提交并推送为 `73d36b37`。
 
 2026-11-05 P2 实际变更：
 
@@ -46,7 +69,7 @@ P2 验证（Node `v24.22.1` / pnpm `10.34.9`）：
 - 证据归档在被 Git/Docker 忽略的 `config/p2-baseline/evidence/`；HTTP 脚本仍位于 p1-baseline，认证密钥/随机密码/Cookie 不落盘。
 - 主动诊断覆盖 6 个代码文件和 4 份更新文档：5 个代码文件 clean；首页保留 4 条既有静态规则警告与 1 条既有提示，无新增错误；4 份文档无语言服务答复（inconclusive），未计为 LSP 通过。代码 Prettier、git diff --check 和 Markdown 换行/尾空白/围栏/本地链接检查通过。
 
-未完成：P3 真实链接/搜索/模式切换器、P4 菜单、P5 完整浏览器/反代验收、P6 CI/CD；P0 外部仓库设置仍待单独授权。没有真实跨标签页浏览器、触屏、OIDC 或反代验收；上游主题/颜色等自身的存储容错不在本阶段改动范围。本轮未进入 P3、未提交推送、未发布部署。
+未完成：P3 真实链接/搜索/模式切换器、P4 菜单、P5 完整浏览器/反代验收、P6 CI/CD；P0 外部仓库设置仍待单独授权。没有真实跨标签页浏览器、触屏、OIDC 或反代验收；上游主题/颜色等自身的存储容错不在本阶段改动范围。P2 结束时未进入 P3、未提交推送、未发布部署；后续提交与 P3 状态以上方记录为准。
 
 ### P1 配置模型、纯解析与响应过滤记录（历史）
 
@@ -70,7 +93,7 @@ P1 验证证据（Node `v24.22.1` / pnpm `10.34.9`）：
 - 证据在被 Git/Docker 忽略的 `config/p1-baseline/evidence/`；测试脚本/配置也在同目录，随机认证凭据和 Cookie 只在内存。
 - 主动 LSP 检查 13 个文件：7 个新增 JS 及本地 Python 脚本共 8 个 clean；唯一接入文件仍有 2 条既有无效 await 提示及 3 条既有静态规则警告，无新增错误。4 份更新文档无语言服务答复（inconclusive），不能记为 LSP 通过。Prettier 代码检查、Python py_compile 和 Markdown 换行/尾空白/围栏/本地链接检查通过。
 
-P1 结束时尚未进入 P2，功能与文档随后已授权提交推送；当前 P2 状态以上方记录为准。P0 外部设置及 P3～P6 仍未完成。
+P1 结束时尚未进入 P2，功能与文档随后已授权提交推送；后续 P2/P3 状态以上方记录为准。P0 外部设置及 P4～P6 仍未完成。
 
 ### P0 本地基线验证记录（历史）
 
@@ -105,7 +128,7 @@ P0 实际验证：
 
 本轮文档校验：5 个文件的相互链接、已存在源码路径引用、结尾换行、尾部空白与代码围栏检查通过；4 段 YAML 及全部 JSON 示例解析通过。对 5 个 Markdown 文件的主动 LSP 检查均未得到语言服务有效答复，结果为 inconclusive，不能记为静态诊断通过。
 
-初始交付时所有新增字段均待实现；目前 P1/P2 已提供解析、响应过滤和偏好状态，但在 YAML 中填入仍不会获得设计中的切换器或菜单，须完成后续阶段。
+初始交付时所有新增字段均待实现；目前 P1～P3 已提供解析、响应过滤、偏好、切换器及卡片/搜索联动，服务菜单仍待 P4，完整验收仍待后续阶段。
 
 ## 初始核查快照（2026-11-05）
 
@@ -120,14 +143,13 @@ P0 实际验证：
 
 ## 建议下一步
 
-P2 已建立偏好恢复合同，下一步经用户确认进入 **P3：真实链接、模式切换与搜索联动**：
+P3 代码及自动化已完成；下一步经用户确认进入 **P4：服务菜单与无障碍**，并安排可用浏览器环境补齐 P3 的真实导航/布局验收：
 
-1. 图标/标题使用同一纯解析结果；只有可扩展服务在 ready 前抑制 href，其余旧服务/书签照常。
-2. 顶部信息区增加模式切换器，无 Widget 时也显示；消费 useNetwork，不另建模式状态。
-3. 服务搜索使用不可变派生链接，面板已打开时也随模式更新；ready 前不可绕过保护，书签/搜索引擎/手动 URL 不变。
-4. 新增英文/简中文案，完成组件和页面回归，不提前混入 P4 菜单。
+1. 菜单只在可扩展且 ready 的服务导航区接管右键，不能拦截 Widget/统计，保留 Shift+右键原生回退。
+2. 可见更多按钮、Portal/边缘定位、单菜单互斥、外部点击/Escape/滚动/模式变更关闭及焦点恢复。
+3. 使用已有 getServiceAddressOptions 候选与 getServiceNavigation 状态，临时地址链接不改全局模式；复制失败提示不能假成功。
 
-内部约定：内置 default 的 `label: null` 留给 UI i18n；菜单候选为 `{ id, label, href, current }`，fallback 说明使用解析结果；ready 抑制由 P3/P4 真实导航组件实现，不能混入纯解析器。
+内部约定：default 的 `label: null` 用 i18n；候选为 `{ id, label, href, current }`，fallback 说明取解析结果。getServiceSearchEntry 必须每次接收原始服务，不能对已覆盖 href 的派生项再次解析。
 
 P0 外部仓库设置仍单独待授权；不能将本地旧 `origin/HEAD -> origin/dev` 当成 GitHub 实时默认分支。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
 

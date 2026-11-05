@@ -126,11 +126,17 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
 
   function openCurrentItem(newWindow, index = activeItemIndex) {
     const result = results[index];
+    // A recovering service keeps its result position but has no navigable href.
+    if (!result?.href) return false;
+    // User-activated external navigation is intentional (SPEC SRCH-01), not an
+    // auth redirect. Alternate service URLs are validated before reaching here.
+    // pi-lens-ignore: no-open-redirect-js
     window.open(
       result.href,
       newWindow ? "_blank" : (result.target ?? searchProvider?.target ?? settings.target ?? "_blank"),
       "noreferrer",
     );
+    return true;
   }
 
   const closeAndReset = useCallback(() => {
@@ -156,8 +162,7 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
       closeAndReset();
       event.preventDefault();
     } else if (event.key === "Enter" && results.length) {
-      closeAndReset();
-      openCurrentItem(event.metaKey);
+      if (openCurrentItem(event.metaKey)) closeAndReset();
     } else if (event.key === "ArrowDown" && results[activeItemIndex + 1]) {
       setCurrentItemIndex(activeItemIndex + 1);
       event.preventDefault();
@@ -179,9 +184,8 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
   }
 
   function handleItemClick(event) {
-    closeAndReset();
     // in case hover doesnt fire, use the clicked item, not the highlighted one
-    openCurrentItem(event.metaKey, parseInt(event.currentTarget.dataset.index, 10));
+    if (openCurrentItem(event.metaKey, parseInt(event.currentTarget.dataset.index, 10))) closeAndReset();
   }
 
   function handleItemKeyDown(event) {
@@ -313,11 +317,14 @@ export default function QuickLaunch({ servicesAndBookmarks, searchString, setSea
                       <button
                         type="button"
                         data-index={i}
+                        disabled={!r.href}
+                        aria-busy={!r.href}
+                        title={!r.href ? t("network.restoring") : undefined}
                         onMouseEnter={handleItemHover}
                         onClick={handleItemClick}
                         onKeyDown={handleItemKeyDown}
                         className={classNames(
-                          "flex flex-row w-full items-center justify-between rounded-md text-sm md:text-xl py-2 px-4 cursor-pointer text-theme-700 dark:text-theme-200",
+                          "flex flex-row w-full items-center justify-between rounded-md text-sm md:text-xl py-2 px-4 cursor-pointer text-theme-700 dark:text-theme-200 disabled:cursor-not-allowed disabled:opacity-50",
                           i === activeItemIndex && "bg-theme-300/50 dark:bg-theme-700/50",
                         )}
                       >

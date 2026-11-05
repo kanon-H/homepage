@@ -10,6 +10,7 @@ import useSWR, { SWRConfig } from "swr";
 
 import BookmarksGroup from "components/bookmarks/group";
 import ErrorBoundary from "components/errorboundry";
+import ModeSwitcher from "components/network/mode-switcher";
 import QuickLaunch from "components/quicklaunch";
 import ServicesGroup from "components/services/group";
 import Tab, { slugifyAndEncode } from "components/tab";
@@ -18,11 +19,12 @@ import Widget from "components/widgets/widget";
 import { withPageAuth } from "utils/auth";
 import { getDashboardData } from "utils/config/dashboard";
 import { ColorContext } from "utils/contexts/color";
-import { NetworkProvider } from "utils/contexts/network";
+import { NetworkProvider, useNetwork } from "utils/contexts/network";
 import { SettingsContext } from "utils/contexts/settings";
 import { TabContext } from "utils/contexts/tab";
 import { ThemeContext } from "utils/contexts/theme";
 import useWindowFocus from "utils/hooks/window-focus";
+import { getServiceSearchEntry } from "utils/network/navigation";
 import themes from "utils/styles/themes";
 
 const ThemeToggle = dynamic(() => import("components/toggles/theme"), {
@@ -174,6 +176,7 @@ function getAllServices(services) {
 
 function Home({ initialSettings }) {
   const { i18n } = useTranslation();
+  const network = useNetwork();
   const { theme, setTheme } = useContext(ThemeContext);
   const { color, setColor } = useContext(ColorContext);
   const { settings, setSettings } = useContext(SettingsContext);
@@ -188,9 +191,14 @@ function Home({ initialSettings }) {
   const { data: bookmarks } = useSWR("/api/bookmarks");
   const { data: widgets } = useSWR("/api/widgets");
 
-  const servicesAndBookmarks = [...bookmarks.map((bg) => bg.bookmarks).flat(), ...getAllServices(services)].filter(
-    (i) => i?.href,
-  );
+  // Filter using original hrefs first: expandable results remain present (but
+  // disabled) during recovery. Never resolve bookmarks or mutate SWR objects.
+  const servicesAndBookmarks = [
+    ...bookmarks.flatMap((group) => group.bookmarks).filter((item) => item?.href),
+    ...getAllServices(services)
+      .filter((service) => service?.href)
+      .map((service) => getServiceSearchEntry(service, network)),
+  ];
 
   useEffect(() => {
     const language = normalizeLanguage(settings.language);
@@ -431,37 +439,34 @@ function Home({ initialSettings }) {
           )}
         >
           <div id="widgets-wrap" className={classNames("flex flex-row w-full flex-wrap justify-between gap-x-2")}>
-            {widgets && (
-              <>
-                {widgets
-                  .filter((widget) => !rightAlignedWidgets.includes(widget.type))
-                  .map((widget, i) => (
-                    <Widget
-                      key={i}
-                      widget={widget}
-                      style={{ header: headerStyle, isRightAligned: false, cardBlur: settings.cardBlur }}
-                    />
-                  ))}
+            {widgets
+              ?.filter((widget) => !rightAlignedWidgets.includes(widget.type))
+              .map((widget, i) => (
+                <Widget
+                  key={i}
+                  widget={widget}
+                  style={{ header: headerStyle, isRightAligned: false, cardBlur: settings.cardBlur }}
+                />
+              ))}
 
-                <div
-                  id="information-widgets-right"
-                  className={classNames(
-                    "m-auto flex flex-wrap grow sm:basis-auto justify-between md:justify-end",
-                    "m-auto flex flex-wrap grow sm:basis-auto justify-between md:justify-end gap-x-2",
-                  )}
-                >
-                  {widgets
-                    .filter((widget) => rightAlignedWidgets.includes(widget.type))
-                    .map((widget, i) => (
-                      <Widget
-                        key={i}
-                        widget={widget}
-                        style={{ header: headerStyle, isRightAligned: true, cardBlur: settings.cardBlur }}
-                      />
-                    ))}
-                </div>
-              </>
-            )}
+            <div
+              id="information-widgets-right"
+              className={classNames(
+                "m-auto flex flex-wrap grow sm:basis-auto justify-between md:justify-end",
+                "m-auto flex flex-wrap grow sm:basis-auto justify-between md:justify-end gap-x-2",
+              )}
+            >
+              {widgets
+                ?.filter((widget) => rightAlignedWidgets.includes(widget.type))
+                .map((widget, i) => (
+                  <Widget
+                    key={i}
+                    widget={widget}
+                    style={{ header: headerStyle, isRightAligned: true, cardBlur: settings.cardBlur }}
+                  />
+                ))}
+              <ModeSwitcher />
+            </div>
           </div>
         </div>
 

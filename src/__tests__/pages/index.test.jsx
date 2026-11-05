@@ -35,6 +35,7 @@ const {
     widgetsData: [],
     quickLaunchProps: null,
     networkObserver: vi.fn(),
+    quickLaunchObserver: vi.fn(),
     widgetCalls: [],
     windowFocused: false,
   };
@@ -155,6 +156,7 @@ vi.mock("components/tab", () => ({
 vi.mock("components/quicklaunch", () => ({
   default: function QuickLaunchProbe(props) {
     state.networkObserver(useNetwork());
+    state.quickLaunchObserver(props);
     state.quickLaunchProps = props;
     return (
       <div data-testid="quicklaunch">
@@ -626,5 +628,91 @@ describe("pages/index Home behavior", () => {
 
     const rightAligned = state.widgetCalls.filter((c) => c.style?.isRightAligned).map((c) => c.widget.type);
     expect(rightAligned).toEqual(["search"]);
+  });
+});
+
+describe("homepage network mode and search integration", () => {
+  const initialSettings = {
+    title: "Homepage",
+    layout: {},
+    extensions: {
+      network: {
+        modes: [
+          { id: "lan", label: "LAN" },
+          { id: "vpn", label: "VPN" },
+        ],
+      },
+    },
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.validateData = [];
+    state.hashData = null;
+    state.windowFocused = false;
+    state.servicesData = [];
+    state.bookmarksData = [];
+    state.widgetsData = [];
+    state.widgetCalls = [];
+    localStorage.removeItem(NETWORK_PREFERENCE_KEY);
+  });
+
+  it.each([[], undefined])("shows the switcher in the top right when widgets are %j", async (widgets) => {
+    state.widgetsData = widgets;
+    await renderIndex({ initialSettings });
+    const select = screen.getByRole("combobox", { name: "network.mode" });
+    expect(select.closest("#information-widgets-right")).toBeTruthy();
+    expect(select.closest("#footer")).toBeNull();
+    fireEvent.change(select, { target: { value: "lan" } });
+    expect(select).toHaveValue("lan");
+    localStorage.removeItem(NETWORK_PREFERENCE_KEY);
+  });
+
+  it("derives nested service search hrefs from raw frozen data, protects restoration, and leaves bookmarks alone", async () => {
+    const service = Object.freeze({
+      name: "Network App",
+      type: "service",
+      target: "_self",
+      href: "https://default.example.invalid",
+      extensions: { network: { addresses: { lan: "http://lan.example.invalid/Case" } } },
+    });
+    const legacy = Object.freeze({ name: "Legacy", type: "service", href: "/legacy" });
+    const bookmark = Object.freeze({
+      name: "Bookmark",
+      href: "https://bookmark.example.invalid",
+      extensions: { network: { addresses: { lan: "http://bookmark-lan.example.invalid" } } },
+    });
+    state.servicesData = Object.freeze([
+      {
+        name: "Root",
+        services: Object.freeze([legacy]),
+        groups: Object.freeze([{ name: "Child", services: Object.freeze([service]), groups: [] }]),
+      },
+    ]);
+    state.bookmarksData = Object.freeze([{ name: "Links", bookmarks: Object.freeze([bookmark]) }]);
+    localStorage.setItem(NETWORK_PREFERENCE_KEY, '{"version":1,"mode":"lan"}');
+    try {
+      await renderIndex({ initialSettings });
+      const first = state.quickLaunchObserver.mock.calls[0][0].servicesAndBookmarks;
+      expect(first.map((entry) => entry.name)).toEqual(["Bookmark", "Legacy", "Network App"]);
+      expect(first[0]).toBe(bookmark);
+      expect(first[1]).toBe(legacy);
+      expect(first[2].href).toBeUndefined();
+      expect(state.quickLaunchProps.servicesAndBookmarks[2]).toMatchObject({
+        href: service.extensions.network.addresses.lan,
+        target: "_self",
+        type: "service",
+      });
+      fireEvent.keyDown(document.body, { key: "x" });
+      expect(state.quickLaunchProps.isOpen).toBe(true);
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "vpn" } });
+      expect(state.quickLaunchProps.isOpen).toBe(true);
+      expect(state.quickLaunchProps.searchString).toBe("x");
+      expect(state.quickLaunchProps.servicesAndBookmarks[2].href).toBe(service.href);
+      expect(state.quickLaunchProps.servicesAndBookmarks[0]).toBe(bookmark);
+      expect(service.href).toBe("https://default.example.invalid");
+      expect(state.servicesData[0].groups[0].services[0]).toBe(service);
+    } finally {
+      localStorage.removeItem(NETWORK_PREFERENCE_KEY);
+    }
   });
 });
