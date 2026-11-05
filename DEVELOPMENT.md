@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P0～P2 已验证；P3 链接/搜索与 P4 服务菜单已实现并通过自动化，真实浏览器导航/菜单/手机布局验收仍待完成。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
+> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成，P6 未执行。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
 
 ## 1. 阅读顺序
 
@@ -116,7 +116,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线及 P1/P2 已完成，P3/P4 代码与自动化已完成但真实浏览器验收待做；外部仓库设置待授权，P5/P6 未完成。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
+P0 本地基线、P1～P4 功能、P5 自动化与文档已完成；P5 手工/目标环境验收、P0 外部仓库设置和 P6 仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
 
 ### P0：建立可信开发基线
 
@@ -216,7 +216,7 @@ Vitest 有两条既有嵌套 `vi.unmock` 提升警告，位于 `src/utils/proxy/
 - [x] 搜索面板打开后模式变更立即生效，ready 保护一致。
 - [x] 普通书签、搜索引擎、手动 URL 不变化。
 - [x] 新增英文和简中文案，不改模式标签语义。
-- [ ] 真实浏览器的中键、Ctrl/Cmd 点击、原生右键、窄屏/触屏和跨标签页验收：当前没有浏览器可执行程序，未下载或新增 E2E 依赖，不能用 jsdom 代替。
+- [ ] 完整人工浏览器验收：P5 已补充 Chromium 原生操作/多标签页自动化及用户 macOS Cmd/原生菜单反馈；物理手机基础触屏已反馈，但小米/QQ 的同页导航差异及其他未覆盖场景仍未解决，不能用部分通过代替全验收。
 
 2026-11-05 P3 已实现并自动化覆盖 SPEC T07/T08/T16/T22/T26/T27/T30 中的卡片、搜索、恢复与文案部分。菜单相关部分待 P4，T26 手机实际布局及原生导航仍未验收；不标记整个 v1 完成。
 
@@ -253,7 +253,7 @@ P3 后续已按用户要求提交/推送为 `3f7aed7e`（含保留的 JSON 格�
 - [x] 默认/备用地址链接、当前来源标记、复制当前地址。
 - [x] 单菜单互斥、滚动/外部点击关闭、焦点恢复、按键事件隔离。
 - [x] Clipboard 失败提示、Shift+右键回退。
-- [ ] 原生中键/Ctrl-Cmd/右键/Shift、实际菜单边缘/遮挡、触屏及键盘焦点的真实浏览器验收：环境仍无浏览器，不把 jsdom 当成通过。
+- [ ] 完整人工菜单验收：P5 已补齐 Chromium 原生操作/几何/焦点自动化及用户 macOS 原生菜单、手机触屏基础反馈；小米/QQ 同页导航差异和未覆盖交互仍待解决，触屏模拟不代替完整物理验收。
 
 2026-11-05 P4 代码与自动化验收：覆盖 SPEC T21～T25 及菜单侧 T07/T08/T16/T22/T30 的相关部分；真实浏览器要求仍未完成，不宣称完整 v1 已完成。
 
@@ -279,19 +279,60 @@ P3 后续已按用户要求提交/推送为 `3f7aed7e`（含保留的 JSON 格�
 
 日志副本与源码校验和在被 Git/Docker 忽略的 `config/p4-baseline/evidence/`。原始日志 `/tmp/homepage-p4-{install,focused,coverage,lint,test,build,smoke}.log` 及 `server-{enabled,disabled,legacy}.log`；复用的脚本仍在 p3-baseline，日志 PASS 文案中的 P3 属于脚本名称，旧 P3 evidence 未被覆盖。临时服务仅绑定 `127.0.0.1:3307`，真实认证凭据/Cookie 不落盘。
 
-P4 没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持原样。尚未运行真实浏览器、触屏、多标签页、OIDC、HTTPS/反代/CDN 验收；菜单几何 mock 只证明坐标计算，不证明真实 CSS 未裁剪。P4 尚未提交/推送，未进入 P5、未发布部署。
+P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持原样。P4 结束时尚未运行真实浏览器、多标签页、OIDC 或 HTTPS/反代/CDN，几何 mock 不证明真实 CSS。P4 后续已按用户要求提交/推送为 `808af4fa`；P5 进展见下节，仍未发布部署。
 
 验收仍需：真实浏览器验证中键/右键/移动布局，不只靠 jsdom。
 
 ### P5：安全、兼容与使用文档
 
-- [ ] 跑完整测试与生产构建，修复新增失败。
-- [ ] 登录/退出、API、SSR/Next 数据入口、反代缓存验证不泄漏服务数据。
-- [ ] 配置 enabled false 和纯上游配置回归。
-- [ ] 记录浏览器、分辨率、模式组合、实际结果。
-- [ ] 将文档“待实现”逐项改为真实状态，补充用户使用说明。
+- [x] frozen install、Lint、完整测试与生产构建通过，无新增业务失败。
+- [x] 原生密码登录/退出、API、SSR/Next 数据与本地真实 HTTPS/nginx 缓存验证无匿名数据泄漏。
+- [x] enabled false（含旧偏好）和纯上游配置的真实浏览器回归。
+- [x] 记录 Chromium 版本、桌面/移动模拟视口、模式组合和实际结果。
+- [x] 更新真实实现状态，提供[用户使用说明](docs/configs/network.md)及服务/站点导航入口。
+- [x] 续办普通非安全 HTTP 的真实 Clipboard 不可用、失败反馈/不跳转和后续导航回归；提供[人工记录模板](docs/more/network-acceptance.md)。
+- [x] 用户在 macOS / Chrome `155.0.8059.85`、Edge `154.0.4258.37`（均正式版 arm64）反馈 1～8 项基础桌面操作正常，包括 Cmd 点击、原生右键/Shift、上下键/Escape、缩窄布局及 HTTP 复制失败。
+- [ ] 手工中键（当前设备无中键）、完整键盘焦点/Widget统计等未覆盖项、物理触屏，以及使用中的目标 OIDC/反代/CDN 验收。
 
-验收：SPEC 的完成定义；功能与部署状态分开记录。
+2026-11-05：**P5 自动化与文档完成，完整验收未完成**。没有业务源码、认证、Widget、依赖/锁文件、Actions 或生产服务改动。用户现另行授权提交/推送本轮 P5 成果，不包含恢复兼容排查、P6、发布或生产部署。下表保留初次 237 项验证；续办 245 项见后文。
+
+| 检查             | 命令 / 结果                                                                                                                                                                         |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 环境与依赖       | Node `v24.22.1` / Corepack `0.36.0` / `corepack pnpm@10.34.9 install --frozen-lockfile` 通过，依赖声明/锁文件不变                                                                   |
+| Lint             | `corepack pnpm@10.34.9 lint` 通过                                                                                                                                                   |
+| 完整 Vitest      | `corepack pnpm@10.34.9 test`：583 文件 / 2229 测试通过，101.90 秒；仍为两条上游 vi.unmock 警告                                                                                      |
+| 生产构建与浏览器 | `python3 scripts/network-acceptance.py --build --chromium <existing-chromium> --nginx <isolated-nginx>`：构建及 enabled/disabled/legacy/chinese 四配置 237 项检查通过，无 pageerror |
+| 浏览器/代理      | Python `3.13.5`、现有 Python Playwright `1.61.0`、Chromium `149.0.7827.55` headless、nginx `1.26.3`；工具不加入项目依赖                                                             |
+| UI 证据          | 桌面 1440×900、1200×700；移动 390×844 触屏模拟；短视口 320×240；真实中键/Ctrl-click、右键事件/Shift、焦点/滚轮、剪贴板权限、storage、跨页搜索及菜单视口测量                         |
+| 缓存正对照       | 真实 nginx HTTPS 共享缓存：公开 fixture MISS→HIT；不设 Cookie bypass，登录首页/API/Next 数据反复预热后，匿名及退出客户端仍受限                                                      |
+
+验收入口新增为可分发的 `scripts/network-acceptance.py`，不再依赖之前仅在 config 下存在的私有基线脚本。源 commit 为 `808af4fa` 加本轮未提交工作树；report 记录 dirty 标志、工具版本、源码 SHA256、每项检查和未证明范围，不将 dirty 工作树称为该 commit 的原样产物。
+
+用户明确授权仅在 `config/p5-baseline/tools/` 下载/解包缺失动态库、字体及代理工具；未运行 sudo、系统包安装或修改 nginx-ui/系统服务。已有 Playwright/Chromium 缓存不等于最初就能运行：初始缺少动态库；中文截图最初缺少 CJK 字体，已隔离补齐后复验。
+
+脚本以虚构配置启动仅 loopback 的 standalone、Widget/监控 fixture 后端与临时 HTTPS 缓存代理；真实用户 config 不被读取。随机密码/认证密钥仅传入子进程环境和运行内存，脚本不导出 Cookie、storageState 或 trace；浏览器临时 profile 由 Playwright 在关闭时清理，测试 TLS key 在 finally 删除，实例和代理均停止。
+
+调试发现的是工具环境/测试脚本问题而非业务回归：nginx 默认临时路径须改到隔离目录；原生中键的后台标签页使用 context 观测和真实 loopback 目标；剪贴板拒绝权限须指定正确 context 并拒绝两种写入权限；搜索测试须等待上游 200ms 清理/300ms 关闭动画；storage 注入限当前 origin，避免 about:blank 自身报错。没有删除失败断言、关闭原有测试或用 jsdom 顶替。
+
+初次完整构建/浏览器 evidence 为 `config/p5-baseline/run-20261105T110042Z-d248c5/`（Git/Docker 已忽略），237 项全部通过，report 的 harness SHA256 对应当时脚本；含报告、构建/服务/代理日志及桌面/移动/短视口/中文截图。汇总副本与源码校验和位于 `config/p5-baseline/evidence/`。原始命令输出为 `/tmp/homepage-p5-{install,lint,test,browser,docs,format}.log`。
+
+续办完整构建及四配置加普通 HTTP 共 **245 项检查通过**（原 237 项 + HTTP 8 项），无 pageerror；证据为 `config/p5-baseline/run-20261105T120153Z-34cf78/`，汇总副本/最新源码校验和在 `config/p5-baseline/evidence/continued/`，不覆盖初次归档。执行 `--build --insecure-http`；report 的 `insecure_http_executed` 为 true，harness SHA256 与当前脚本匹配。frozen install、Lint 和全量 583 文件 / 2229 测试再次通过，Vitest 98.22 秒，仍只有两条上游 vi.unmock 警告；续办日志为 `/tmp/homepage-p5-{install,lint,test,browser,docs,format}-continued.log`。
+
+普通 HTTP 使用 `http://p5-fixture.test:3308`，只通过 Chromium 的单次 host-resolver 规则映射到 loopback，不修改系统 DNS/hosts；没有把 localhost 的可信上下文当普通 HTTP。浏览器实际确认 `isSecureContext === false` 且 Clipboard API 不存在，原生密码登录成功后仍为该非安全 origin；复制给出失败提示、没有成功状态或跳转，后续模式切换仍可用，Host 拒绝仍生效。此临时虚构配置不是生产 HTTP 部署建议，也不是关闭浏览器安全策略或注入 API 缺失。
+
+人工记录模板新增于 `docs/more/network-acceptance.md`，模板默认全部“未执行”，实际结果单独由操作者反馈，不直接把模板勾成通过。用户随后使用独立内网临时实例，在 macOS 电脑的 Chrome `155.0.8059.85`、Edge `154.0.4258.37`（均正式版 arm64）确认 1～8 项基础桌面测试正常；含登录/模式导航、刷新恢复、临时默认打开不改模式、Cmd 点击、标题自定义/Shift 原生/旧服务原生菜单、上下键/Escape、缩窄菜单及 HTTP 复制失败反馈。详细原始反馈在被忽略的 `config/p5-manual/` 对应 session 的 `manual-feedback.md`；不记录真实地址或凭据到 Git。手工中键因当前设备无该按钮而未执行，macOS 具体版本/viewport 未提供；完整键盘焦点、Widget统计、物理触屏和适用目标环境仍未覆盖。续办核查确认 SPEC/DEVELOPMENT 的归档后变更仅为 P5 表格格式，保留该格式，不回滚用户编辑。
+
+手机实际反馈补充：两机基础选择器/导航/菜单触屏与布局检查正常，但华为浏览器（鸿蒙6）新标签打开、红米小米浏览器 `v20.28.1020918` 及两手机 QQ 报告原页打开；用户通过标签数量不变确认真实替换，而非新标签自动切前台。更多按钮本身不跳转，直接标题与菜单地址都有现象；现配置和 live Chromium 探针均为 `_blank`，未在真实小米/QQ 中确定根因。用户已选择暂停；没有创建纯 HTML 对照页、重启/续期或修改业务代码，不将该兼容差异标通过。完整物理场景仍未验收完成。
+
+初次主动诊断检查 8 个交付文件：Python 脚本 clean；6 份 Markdown 无语言服务答复（inconclusive），不算 LSP 通过；mkdocs.yml 的 3 条 unresolved-tag 均是上游既有的 `!!python/name` / `!ENV` 自定义标签，已核对未变并标记 false-positive，不改配置、不加 ignore、不称 YAML LSP clean。受控 SafeLoader 子类只将这些标签当惰性标量，验证 mkdocs 唯一结构变化为新文档导航项。Python py_compile、新指南 Prettier、Markdown 结构/链接、YAML/JSON 示例、依赖不变和 git diff --check 通过。未安装/运行 Zensical 文档站构建，静态文档检查不等于文档站构建。
+
+续办最终主动诊断覆盖 9 个交付文件：mkdocs 仍为 3 条已核对未变的上游自定义 tag 提示；7 份 Markdown 无语言服务答复，Python 最终重复探测为 push-only/silent-on-clean，因此 8 个文件为 inconclusive，本次批次不计 clean。Python 在修改后、运行前的独立主动探测曾确认 clean，且测试报告 SHA256 匹配同一脚本；不能用最后一次空诊断声称重新确认 clean。py_compile、7 份 Markdown 结构/链接、YAML/JSON 示例、两个新文档 Prettier 与 git diff --check 均通过；Zensical 仍未运行。
+
+续办最终检查确认 3307/3308/3310/3443 无临时监听器，测试 TLS 目录已删除；真实用户配置/凭据未导出，无 git 提交/推送。
+
+边界：trusted Shift/contextmenu 未被取消不证明系统菜单界面；触屏模拟不是物理手机；Linux Ctrl 不是 macOS Cmd；HTTPS 上的 Clipboard 缺失注入与续办普通 HTTP 真实缺失是两条独立证据；本地 nginx 不是目标 CDN，密码登录不是实际 OIDC IdP。这些待办及 SPEC 的手工门禁保留，不宣称完整 v1 完成。
+
+验收：继续遵守 SPEC 完成定义，功能、自动化、人工验收和部署分别记录。
 
 ### P6：专用 CI/CD 与上游集成
 
@@ -337,7 +378,7 @@ pnpm exec vitest run src/utils/auth.test.js src/proxy.test.js src/__tests__/page
 - 手工测试、LSP/静态检查、单元测试各自作用不同，任一为空都不是“全通过”。
 - 如果测试失败或未跑，记录具体命令、错误摘要和环境；不能写“全部通过”。
 - 覆盖率可用 `pnpm test:coverage`，但不要为凑数字写无意义断言。
-- 当前没有独立浏览器 E2E 依赖。先完成可复现的手工步骤；如需引入 Playwright，单独评估依赖、运行成本和 CI 权限，不默认为已有。
+- 项目依赖仍没有 Playwright。P5 可选脚本复用本机已有 Python Playwright，调用方式见 6.2；其他环境若需安装/下载，先评估并授权，不隐式安装、不默认纳入 CI/P6。
 
 ### 6.1 浏览器验收脚本
 
@@ -357,6 +398,31 @@ pnpm exec vitest run src/utils/auth.test.js src/proxy.test.js src/__tests__/page
 12. Clipboard 允许、拒绝、非安全 HTTP 场景反馈准确。
 
 不要为了测试把真实导航配置、Token 或 Session Cookie贴到 issue、日志截图或文档。
+
+### 6.2 可选真实浏览器与 HTTPS 缓存自动化
+
+前置：Python 3.13、Python Playwright（本次 `1.61.0`）、已能启动的 Chromium、nginx 与 openssl。脚本不自动下载工具、不读取部署凭据、不操作系统 nginx/nginx-ui。没有这些工具时应报告未运行，而不是悄悄安装。仓库的 `pyproject.toml` 仍只声明原有文档依赖。
+
+```bash
+python3 scripts/network-acceptance.py --build --insecure-http \
+  --chromium /absolute/path/to/chrome \
+  --nginx /absolute/path/to/nginx
+```
+
+本次隔离解包的环境还需为单次命令提供 `LD_LIBRARY_PATH="$PWD/config/p5-baseline/tools/root/usr/lib/x86_64-linux-gnu"` 和 `FONTCONFIG_FILE="$PWD/config/p5-baseline/tools/fonts.conf"`；不要将这些路径写入全局 shell 配置。其他系统应使用自己经授权准备的运行库/字体，不照抄 Debian 包名当成通用安装方式。
+
+- 默认跑四配置；`--insecure-http` 额外验证非安全 HTTP origin 的 8 项检查，并在 report 记录是否执行。`--phases enabled` 可聚焦调试；省略 `--build` 仅复用已有 standalone 产物，报告标记未构建，**不能用它证明改动后的源码通过生产构建**。
+- 需要空闲的 loopback 3307（应用）、3310（虚构后端）、3443（HTTPS nginx）端口；使用 `--insecure-http` 时还需 3308（HTTP nginx）；发现占用停止，不杀其他服务。需要能访问本机 localhost，正常退出/异常会清理本轮实例。
+- 每轮在 Git/Docker 忽略的 `config/p5-baseline/run-.../` 创建虚构 YAML、报告、日志和截图；TLS key 使用临时子目录并删除。脚本不生成可部署配置，不采集真实 Session，不创建公开导航 API。
+- 代理启用真实共享缓存且保留上游缓存头语义；必须先证明公开 fixture 可 HIT，再验证受保护响应始终不可共享。不要添加强制忽略 Cache-Control/Set-Cookie 的规则，也不要用全部请求 bypass 冒充缓存验收。
+- API 缺失/网络 key 存储抛错是有标记的故障注入；权限拒绝使用真实 Chromium context 权限；移动使用浏览器触屏模拟。详细边界在 report 的 `not_proven` 和 SPEC 的 P5 证据分层中。
+- **不替代 6.1 人工验收**：记录操作者的浏览器/OS、设备、viewport、配置、结果与必要截图。目标 OIDC/生产缓存测试必须另行获得环境授权；不自动发布或部署。
+
+### 6.3 剩余人工与目标环境验收
+
+使用[人工验收记录模板](docs/more/network-acceptance.md)，记录真实浏览器版本、OS、物理设备、配置代号和实际结果；保持未执行/失败项，不把无头事件当原生系统菜单、触屏模拟当物理手机、Linux Ctrl 当 macOS Cmd。
+
+当前本机自动化无失败，剩余门禁需要操作者的实际设备及获准的目标认证/缓存环境，不是后台任务仍在运行。未提供设备/环境或目标授权时，不自动进入 P6，不代签人工结果，不暴露临时实例到局域网/公网，也不提交/推送/部署。
 
 ## 7. 开发配置与原生登录
 

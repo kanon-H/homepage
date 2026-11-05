@@ -5,6 +5,8 @@ description: Service Configuration
 
 Services are configured inside the `services.yaml` file. You can have any number of groups, and any number of services per group.
 
+This Fork also provides optional [multi-address navigation](network.md). It affects service links only, not widget or monitor connections, and is disabled unless configured.
+
 ## Groups
 
 Groups are defined as top-level array entries.
