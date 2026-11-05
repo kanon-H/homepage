@@ -5,9 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { invalidateDashboardData } from "utils/config/dashboard";
 import { ColorContext } from "utils/contexts/color";
+import { useNetwork } from "utils/contexts/network";
 import { SettingsContext } from "utils/contexts/settings";
 import { TabContext } from "utils/contexts/tab";
 import { ThemeContext } from "utils/contexts/theme";
+import { NETWORK_PREFERENCE_KEY } from "utils/network/storage";
 
 const {
   state,
@@ -32,6 +34,7 @@ const {
     bookmarksData: [],
     widgetsData: [],
     quickLaunchProps: null,
+    networkObserver: vi.fn(),
     widgetCalls: [],
     windowFocused: false,
   };
@@ -150,7 +153,8 @@ vi.mock("components/tab", () => ({
 }));
 
 vi.mock("components/quicklaunch", () => ({
-  default: (props) => {
+  default: function QuickLaunchProbe(props) {
+    state.networkObserver(useNetwork());
     state.quickLaunchProps = props;
     return (
       <div data-testid="quicklaunch">
@@ -293,6 +297,50 @@ describe("pages/index Wrapper", () => {
     expect(document.querySelector("#inner_wrapper")?.className).toContain("backdrop-blur");
     expect(document.querySelector("#inner_wrapper")?.className).toContain("backdrop-saturate-150");
     expect(document.querySelector("#inner_wrapper")?.className).toContain("backdrop-brightness-125");
+  });
+
+  it("passes real initialSettings to NetworkProvider even while SettingsContext is empty", async () => {
+    const initialSettings = {
+      title: "Homepage",
+      extensions: {
+        network: {
+          defaultMode: "vpn",
+          modes: [
+            { id: "lan", label: "LAN" },
+            { id: "vpn", label: "VPN" },
+          ],
+        },
+      },
+    };
+    localStorage.setItem(NETWORK_PREFERENCE_KEY, '{"version":1,"mode":"lan"}');
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    try {
+      await renderIndex({ initialSettings, settings: {} });
+      const frames = state.networkObserver.mock.calls.map(([value]) => value);
+      expect(frames[0]).toMatchObject({ mode: "vpn", ready: false, settings: { enabled: true } });
+      expect(frames.at(-1)).toMatchObject({ mode: "lan", ready: true });
+      expect(write.mock.calls.filter(([key]) => key === NETWORK_PREFERENCE_KEY)).toEqual([]);
+      expect(initialSettings.extensions.network.defaultMode).toBe("vpn");
+    } finally {
+      write.mockRestore();
+      localStorage.removeItem(NETWORK_PREFERENCE_KEY);
+    }
+  });
+
+  it("keeps a legacy homepage network-disabled without reading a network preference", async () => {
+    const read = vi.spyOn(Storage.prototype, "getItem");
+    try {
+      await renderIndex();
+      expect(state.networkObserver).toHaveBeenCalled();
+      expect(state.networkObserver.mock.calls.at(-1)[0]).toMatchObject({
+        mode: "default",
+        ready: true,
+        settings: { enabled: false },
+      });
+      expect(read.mock.calls.filter(([key]) => key === NETWORK_PREFERENCE_KEY)).toEqual([]);
+    } finally {
+      read.mockRestore();
+    }
   });
 
   it("supports legacy string backgrounds in settings", async () => {

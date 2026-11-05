@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P0 本地基线、P1 配置/解析/响应过滤已验证，尚无多地址 UI。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
+> 当前状态：P0 本地基线、P1 配置/解析/响应过滤、P2 Provider/偏好恢复已验证，尚无多地址 UI。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
 
 ## 1. 阅读顺序
 
@@ -116,7 +116,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线及 P1 已完成，外部仓库设置待单独授权；P2～P6 均未实现。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
+P0 本地基线及 P1/P2 已完成，外部仓库设置待单独授权；P3～P6 均未实现。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
 
 ### P0：建立可信开发基线
 
@@ -175,16 +175,38 @@ Vitest 有两条既有嵌套 `vi.unmock` 提升警告，位于 `src/utils/proxy/
 
 内部接口约定见 DESIGN：纯规范化不记录日志；server.js 仅缓存当前模块实例上一轮脱敏警告集合，不保存浏览器模式。不同路由构建包/进程可各自输出首次警告，不承诺全部署只输出一次。没有引入依赖或改动认证、发现语法、Widget 白名单、浏览器 UI、存储、Actions。
 
-未运行真实浏览器、OIDC、HTTPS/反代缓存验收；这些仍属后续阶段。当前 P1 改动未提交/推送，等待用户确认后才进入 P2。
+未运行真实浏览器、OIDC、HTTPS/反代缓存验收；这些仍属后续阶段。P1 改动随后已按用户要求提交/推送为 `b584b902`；当前 P2 状态见下一节。
 
 ### P2：Provider 与偏好恢复
 
-- [ ] 新建安全 storage 适配和 `NetworkProvider` / Hook。
-- [ ] 页面级 Provider 接收真实 `initialSettings`。
-- [ ] 完成 SSR 首帧、ready、存储失败、StrictMode、多标签页和配置变更处理。
-- [ ] 无 Provider 时返回禁用状态，兼容上游独立组件测试。
+- [x] 新建安全 storage 适配和 `NetworkProvider` / Hook。
+- [x] 页面级 Provider 接收真实 `initialSettings`。
+- [x] 完成 SSR 首帧、ready、存储失败、StrictMode、多标签页和配置变更处理。
+- [x] 无 Provider 时返回禁用状态，兼容上游独立组件测试。
 
-验收：SPEC T15～T20；不在 Render 读 window，不先写默认偏好，不污染共享缓存。
+2026-11-05 P2 验收：SPEC T15～T20 的 storage/Provider 生命周期部分已覆盖；T16 真实卡片和搜索入口的 ready 抑制仍待 P3，不能标为整个场景已完成。多标签页通过合成 localStorage 事件测试，未替代真实浏览器跨标签页验收。
+
+实际命令均使用 Node `v24.22.1`、`corepack pnpm@10.34.9`：
+
+| 检查            | 命令 / 结果                                                                                                                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 依赖            | `install --frozen-lockfile` 通过，package.json / 锁文件未改                                                                                                                                                                                                  |
+| 聚焦回归        | `exec vitest run src/utils/network src/utils/contexts src/__tests__/pages/index.test.jsx src/__tests__/pages/_app.test.jsx src/components/services/item.test.jsx src/components/quicklaunch.test.jsx`：13 文件 / 282 测试通过                                |
+| 完整回归        | `test`：579 文件 / 2142 测试通过，105.06 秒，比 P1 新增 71 项；仅保留两条原有 vi.unmock 警告                                                                                                                                                                 |
+| Lint            | `lint` 通过                                                                                                                                                                                                                                                  |
+| 覆盖率          | `exec vitest run src/utils/network/storage.test.js src/utils/contexts/network.test.jsx --coverage --coverage.include='src/utils/network/storage.js' --coverage.include='src/utils/contexts/network.jsx'`：69 测试通过；新模块行 100%、分支 95.45%、函数 100% |
+| 生产构建与 HTTP | 在 P2 代码上复用 `python3 config/p1-baseline/run-baseline.py`，构建和 standalone 登录/退出、权限、SSR/API 同源、过滤及 private/no-store 回归全部通过，临时服务结束停止                                                                                       |
+| 主动诊断与格式  | 6 个代码文件检查，5 个 clean；index.jsx 保留 4 条既有静态规则警告及 1 条提示，无新增错误；4 份文档 LSP 无答复（inconclusive），未计为通过；代码 Prettier、git diff --check、Markdown 静态检查通过                                                            |
+
+修改范围：新增 storage.js / storage.test.js、contexts/network.jsx / network.test.jsx；首页仅导入并用 NetworkProvider 包裹 Index；首页测试增加 2 项接入验证，未弱化现有断言。开发时发现新测试探针在 Render 赋值触发 React Hooks 纯度规则，已改为布局 Effect 暴露测试状态；未关闭 Lint 规则。
+
+实现采用 React 原生 useSyncExternalStore，每个 Provider 自有快照；SSR/首帧不读取浏览器，订阅阶段恢复，用户事件显式写回。storage 的 parse/read/write/remove 返回安全降级结果；Provider 不在初始化、无效值回退或禁用时调用删除。重新启用需再次恢复；配置变化保留合法偏好，非法当前 ID 在同一 Render 就回退。不读写 YAML/SWR/服务器共享数据，不引入依赖。
+
+本轮日志为 `/tmp/homepage-p2-{install,focused,coverage,lint,test,build,smoke,server}.log`，证据副本在 Git/Docker 忽略的 `config/p2-baseline/evidence/`。HTTP 回归复用 p1-baseline 的配置和脚本，因此日志 PASS 文案仍带 P1 字样；构建/服务日志从该脚本原路径复制为 P2 证据，未覆盖已归档的 P1 证据。本轮没有单独新增 Python 脚本。
+
+没有真实浏览器跨标签页、触屏、OIDC、HTTPS 或反代/CDN 验收；本阶段测试仅保证网络扩展的存储容错，未改动上游 Theme/Color 等自身的存储代码，全页禁用存储的浏览器兼容性仍需后续核查。UI 仍使用上游原始 href，偏好尚不改变真实导航。当前 P2 未提交/推送，未进入 P3。
+
+验收：不在 Render 读 window，不先写默认偏好，不污染共享缓存。
 
 ### P3：真实链接、模式切换与搜索联动
 

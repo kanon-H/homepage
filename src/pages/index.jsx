@@ -18,6 +18,7 @@ import Widget from "components/widgets/widget";
 import { withPageAuth } from "utils/auth";
 import { getDashboardData } from "utils/config/dashboard";
 import { ColorContext } from "utils/contexts/color";
+import { NetworkProvider } from "utils/contexts/network";
 import { SettingsContext } from "utils/contexts/settings";
 import { TabContext } from "utils/contexts/tab";
 import { ThemeContext } from "utils/contexts/theme";
@@ -556,7 +557,9 @@ export default function Wrapper({ initialSettings, fallback }) {
             backgroundBrightness && `backdrop-brightness-${initialSettings.background.brightness}`,
           )}
         >
-          <Index initialSettings={initialSettings} fallback={fallback} />
+          <NetworkProvider initialSettings={initialSettings}>
+            <Index initialSettings={initialSettings} fallback={fallback} />
+          </NetworkProvider>
         </div>
       </div>
     </>

@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P0 本地基线、P1 配置/解析/响应过滤已验证；Provider 和多地址 UI 尚未实现。本文区分现有模块与后续设计，不表示扩展整体已验收。
+> 状态：P0 本地基线、P1 配置/解析/响应过滤、P2 Provider/偏好恢复已验证；多地址 UI 尚未实现。本文区分现有模块与后续设计，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -113,7 +113,7 @@ config/services.yaml
 使用可选的 `extensions.network` 命名空间，不新增 `lanUrl`、`wanUrl` 等固定二元字段。
 
 ```yaml
-# settings.yaml：P1 已支持解析；切换器与偏好恢复待 P2/P3
+# settings.yaml：P1/P2 已支持解析和偏好状态；切换器待 P3
 extensions:
   network:
     enabled: true
@@ -157,7 +157,7 @@ v1 采用现有 YAML，不增加服务配置文件。保留未知的其他扩展
 
 ## 5. 核心架构
 
-### 5.1 模块布局（P1 已实现部分与后续计划）
+### 5.1 模块布局（P1/P2 已实现部分与后续计划）
 
 为沿用现有 alias，不额外增加 `extensions` 路径别名。逻辑仍独立，只通过少量接入点集成：
 
@@ -176,7 +176,7 @@ src/components/network/
   *.test.jsx
 ```
 
-P1 已实现 config.js、resolver.js、server.js 及纯逻辑/响应集成测试；storage、Provider 与组件仍未实现。接口职责不能散落：
+P1 已实现 config.js、resolver.js、server.js 及纯逻辑/响应集成测试；P2 已实现 storage.js、contexts/network.jsx 及存储/Provider/首页接入测试；network UI 组件仍未实现。接口职责不能散落：
 
 ```text
 normalizeNetworkSettings(rawSettings)
@@ -201,11 +201,11 @@ P1 内部接口补充：
 - 内置 default 未指定标签时，规范化值为 `{ id: "default", label: null }`，后续 UI 用 i18n 显示，纯函数不依赖语言环境；显式合法标签保留。
 - 菜单候选返回 `{ id, label, href, current }[]`，仅可扩展服务有候选；按模式 ID 标记当前来源而非按 URL 去重，fallback 提示取解析结果。临时菜单打开不会变更模式。
 - 服务诊断使用分组/服务/地址的索引路径及原因码，不输出原始名称、地址键、ID 或 URL（这些值可能被误填为秘密）；地址索引对应原映射中的枚举顺序。
-- ready 抑制不属于纯函数；P2/P3 未实现前，页面仍按上游 href 导航。
+- ready 抑制不属于纯函数；P2 已提供状态信号，P3/P4 真实导航组件未接入前，页面仍按上游 href 导航。
 
 ### 5.2 Provider 放置
 
-建议在 `src/pages/index.jsx` 的 `Wrapper` 中，围绕首页 `Index` 增加页面级 `NetworkProvider`，传入真实的 `initialSettings`。
+P2 已在 `src/pages/index.jsx` 的 `Wrapper` 中，围绕首页 `Index` 增加页面级 `NetworkProvider`，传入真实的 `initialSettings`；未改 `_app.jsx` 或 SettingsProvider。
 
 理由：
 
@@ -214,7 +214,17 @@ P1 内部接口补充：
 - 仅首页需要网络状态，不必改登录页和整个 `_app.jsx` 的 Provider 链。
 - 页面级入口减少对上游公共框架的修改。
 
-服务组件独立测试时，网络 Hook 在没有 Provider 时必须返回“扩展关闭”的默认值。测试工具可显式包裹 Provider，不强迫所有上游组件测试改写。
+服务组件独立测试时，`useNetwork()` 没有 Provider 即返回扩展关闭、`mode: default`、`ready: true` 及不执行操作的 setMode。测试工具可显式包裹 Provider，不强迫所有上游组件测试改写。
+
+P2 状态实现：
+
+- 使用 React 自带 `useSyncExternalStore`；每个 Provider 通过纯初始化器创建独立内存 store，不使用全局可变模式或第三方状态库。
+- `getServerSnapshot` 与首次 `getSnapshot` 是同一个不可变初始快照，偏好为空、ready 为 false；模式从规范化配置的 defaultMode 派生。浏览器订阅阶段才注册 storage 监听并读取偏好，无论读取成功/失败都结束恢复。
+- storage.js 只解析 version/mode 并保护浏览器 API；定义模式校验在 Provider 完成。显式合法 setMode 才更新内存并尝试写入，存储失败不回滚内存；恢复前/禁用/非法 setMode 返回 false，不排队。
+- 订阅不依赖模式/标签变化；因此选择模式或刷新配置不会反复读存储、重置选择。当前 mode 每次 Render 按最新配置派生，合法偏好优先，已删除模式立即回退，不通过延迟 Effect 暴露旧候选。
+- storage 事件只处理固定 key/clear，且 storageArea 必须等于当前 localStorage；sessionStorage/无关或无法识别的事件忽略。事件直接使用 newValue 更新快照，不再次写入。
+- 禁用时 ready 为 true、mode 为内置 default，不访问存储，也不清除旧偏好；清理订阅时重置恢复快照，重新启用时需重读并完成 ready。StrictMode 重复订阅及卸载移除对应监听器。
+- 默认上下文无副作用；完整上下文为 `{ settings, mode, ready, setMode }`，settings 是 P1 规范化结果而非 SettingsContext 的临时空对象。配置变化来源为 initialSettings 属性更新。
 
 ### 5.3 共享数据与页面派生数据
 
@@ -245,6 +255,8 @@ QuickLaunch 推荐在首页构造不可变的派生服务条目，然后和未�
 - v1 不保证关闭 JavaScript 后多地址服务可导航；普通旧服务仍按原行为。此取舍必须在实现文档中保留。
 
 组件状态、统计按钮、Widget 正常工作，不应因为短暂恢复而卸载整张卡片。
+
+P2 已通过 renderToString/hydrateRoot、StrictMode 和存储故障的 jsdom 测试提供 ready 合同，但真实图标/标题/搜索/菜单的恢复抑制要在 P3/P4 完成；当前没有借测试探针宣称真实 UI 验收通过。
 
 ## 6. UI 与交互
 
@@ -325,10 +337,11 @@ gethomepage/homepage main
 
 ## 11. 当前交付状态
 
-初始规划/P0 文档已按用户要求提交并推送为 `dd145355`，当前分支 `feature/multi-address`。2026-11-05 已完成 P1，尚未提交本轮改动：
+当前分支 `feature/multi-address`，初始规划/P0 文档及 P1 已按用户要求提交推送，HEAD 为 `b584b902`。2026-11-05 已完成 P2，本轮尚未提交：
 
-- 新增配置规范化、纯地址解析、有序菜单候选、递归服务响应过滤和脱敏诊断；上游接入仅在 api-response.js 新增导入与最终过滤调用。
-- Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、577 个测试文件 / 2071 项测试及带虚构多地址配置的生产构建通过。
-- 临时 loopback standalone 服务验证 SSR/API 同源过滤、默认 href、Widget 密钥、原生登录/退出及未登录数据保护，结束已停止。未验证真实浏览器、OIDC 或反代缓存。
-- 没有实现 Provider、存储、模式切换器、卡片/搜索联动或菜单 UI；没有修改依赖声明、锁文件、认证、Widget 白名单、远程设置或 Actions，没有发布部署。
-- P0 的 upstream/GitHub 设置仍待单独授权；下一步经用户确认后进入 P2。完整证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。
+- 新增安全偏好存储适配、每个 Provider 独立的模式状态和恢复/同步/配置变更合同；首页只增加导入及围绕 Index 的页面级 Provider，传入真实 initialSettings。
+- P1 配置规范化/响应过滤不变；不修改原始 href、共享缓存、Widget 或监控目标。尚无模式切换器、卡片/搜索联动或菜单 UI。
+- Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、579 个测试文件 / 2142 项测试及带虚构多地址配置的生产构建通过。
+- SSR/hydration 首帧、StrictMode 和存储异常通过 jsdom 验证；复用临时 loopback standalone HTTP 回归，结束已停止。未验证真实浏览器跨标签页、触屏、OIDC 或反代缓存。
+- 没有修改依赖声明、锁文件、认证、Widget 白名单、远程设置或 Actions，没有发布部署。
+- P0 的 upstream/GitHub 设置仍待单独授权；下一步经用户确认后进入 P3。完整证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。
