@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：设计基线；P0 本地开发基线已验证，多地址功能尚未实现。本文根据本地 Fork 的真实代码编写，不表示扩展已经通过功能测试。
+> 状态：P0 本地基线、P1 配置/解析/响应过滤已验证；Provider 和多地址 UI 尚未实现。本文区分现有模块与后续设计，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -113,7 +113,7 @@ config/services.yaml
 使用可选的 `extensions.network` 命名空间，不新增 `lanUrl`、`wanUrl` 等固定二元字段。
 
 ```yaml
-# settings.yaml：拟新增能力，尚未实现
+# settings.yaml：P1 已支持解析；切换器与偏好恢复待 P2/P3
 extensions:
   network:
     enabled: true
@@ -130,7 +130,7 @@ extensions:
 ```
 
 ```yaml
-# services.yaml：拟新增能力，尚未实现
+# services.yaml：P1 已支持地址校验/过滤；卡片链接联动待 P3
 - 基础设施:
     - NAS:
         href: https://nas.example.com
@@ -157,7 +157,7 @@ v1 采用现有 YAML，不增加服务配置文件。保留未知的其他扩展
 
 ## 5. 核心架构
 
-### 5.1 模块布局（计划新增）
+### 5.1 模块布局（P1 已实现部分与后续计划）
 
 为沿用现有 alias，不额外增加 `extensions` 路径别名。逻辑仍独立，只通过少量接入点集成：
 
@@ -165,6 +165,7 @@ v1 采用现有 YAML，不增加服务配置文件。保留未知的其他扩展
 src/utils/network/
   config.js                 # 配置规范化、地址过滤、诊断结果，纯函数
   resolver.js               # 解析某模式地址、构造菜单项目，纯函数
+  server.js                 # P1 服务响应过滤入口与去重脱敏日志，服务端专用
   storage.js                # 带异常保护的偏好读写，浏览器适配层
   *.test.js
 src/utils/contexts/network.jsx
@@ -175,7 +176,7 @@ src/components/network/
   *.test.jsx
 ```
 
-建议接口契约（最终函数名可以调整，职责不能散落）：
+P1 已实现 config.js、resolver.js、server.js 及纯逻辑/响应集成测试；storage、Provider 与组件仍未实现。接口职责不能散落：
 
 ```text
 normalizeNetworkSettings(rawSettings)
@@ -191,6 +192,16 @@ NetworkProvider({ initialSettings, children })
 ```
 
 `href`/`hasLink` 沿用上游的旧行为；新地址须经单独校验。错误诊断只能含字段路径与原因，不能包含完整 URL、凭据或服务端密钥。
+
+P1 内部接口补充：
+
+- `normalizeNetworkServiceGroups(groups, normalizedSettings) → { groups, diagnostics }`：对已有 Widget 清洗结果递归生成响应副本，不修改输入；没有扩展的服务字段不变。
+- `filterNetworkServiceGroups(groups, rawSettings) → groups`：server.js 在 `servicesResponse()` 最终返回边界调用，SSR/API 无分叉；使用现有 logger，只保留当前模块实例上一轮诊断集合以去重，不缓存模式或服务数据；不同路由构建包/进程可各自记录首次警告。
+- 扩展关闭/全局非法时，响应副本不转发服务的 network 命名空间；保留原始 href、其他扩展和原生导航语义。启用时只用已校验候选替换 addresses，非法 network 整体移除，不能让错误值流向浏览器。
+- 内置 default 未指定标签时，规范化值为 `{ id: "default", label: null }`，后续 UI 用 i18n 显示，纯函数不依赖语言环境；显式合法标签保留。
+- 菜单候选返回 `{ id, label, href, current }[]`，仅可扩展服务有候选；按模式 ID 标记当前来源而非按 URL 去重，fallback 提示取解析结果。临时菜单打开不会变更模式。
+- 服务诊断使用分组/服务/地址的索引路径及原因码，不输出原始名称、地址键、ID 或 URL（这些值可能被误填为秘密）；地址索引对应原映射中的枚举顺序。
+- ready 抑制不属于纯函数；P2/P3 未实现前，页面仍按上游 href 导航。
 
 ### 5.2 Provider 放置
 
@@ -257,7 +268,7 @@ QuickLaunch 推荐在首页构造不可变的派生服务条目，然后和未�
 
 当前 `/api/validate` 主要检查 YAML 语法，不能假设已有新字段语义校验。
 
-v1 计划在配置读取/响应边界复用纯规范化函数，做到：
+P1 已在共享服务响应边界复用纯规范化函数，做到（UI 恢复和菜单错误仍待后续阶段）：
 
 1. 页面可用优先：新扩展有错时局部降级，不使全部首页崩溃。
 2. 全局结构错误降级为扩展关闭；单一模式/单一地址错误只忽略局部。
@@ -314,10 +325,10 @@ gethomepage/homepage main
 
 ## 11. 当前交付状态
 
-初始交付仅有设计、规约和会话交接文档。2026-11-05 已执行 P0 本地基线：
+初始规划/P0 文档已按用户要求提交并推送为 `dd145355`，当前分支 `feature/multi-address`。2026-11-05 已完成 P1，尚未提交本轮改动：
 
-- 已创建 `feature/multi-address` 分支，HEAD 仍为 `2e5f1013`，没有实现网络模式、地址菜单或偏好存储。
-- 已使用 Node `v24.22.1` / pnpm `10.34.9` frozen install；Lint、573 个测试文件 / 1902 项测试及生产构建通过。
-- 已用虚构配置在临时 loopback standalone 服务验证原生密码登录、退出、Host、首页/API/SSR 数据权限及私有缓存响应头。未验证真实浏览器、OIDC 或反代缓存。
-- 没有修改业务源码、依赖声明、锁文件、远程设置或 Actions；没有构建镜像、提交、推送、发布或部署。
-- P0 的 upstream/GitHub 设置仍待单独授权；下一步经用户确认后进入 P1。完整证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。
+- 新增配置规范化、纯地址解析、有序菜单候选、递归服务响应过滤和脱敏诊断；上游接入仅在 api-response.js 新增导入与最终过滤调用。
+- Node `v24.22.1` / pnpm `10.34.9` frozen install、Lint、577 个测试文件 / 2071 项测试及带虚构多地址配置的生产构建通过。
+- 临时 loopback standalone 服务验证 SSR/API 同源过滤、默认 href、Widget 密钥、原生登录/退出及未登录数据保护，结束已停止。未验证真实浏览器、OIDC 或反代缓存。
+- 没有实现 Provider、存储、模式切换器、卡片/搜索联动或菜单 UI；没有修改依赖声明、锁文件、认证、Widget 白名单、远程设置或 Actions，没有发布部署。
+- P0 的 upstream/GitHub 设置仍待单独授权；下一步经用户确认后进入 P2。完整证据与未完成项见 [agent.md](agent.md) 和 [DEVELOPMENT.md](DEVELOPMENT.md)。

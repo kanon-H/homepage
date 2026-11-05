@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P0 本地基线已验证，多地址功能未实现。已执行证据见第 5 节 P0 与 agent.md；其他未勾选项目仍是计划，不代表已经执行。
+> 当前状态：P0 本地基线、P1 配置/解析/响应过滤已验证，尚无多地址 UI。已执行证据见第 5 节和 agent.md；其他未勾选项目仍是计划，不代表已经执行。
 
 ## 1. 阅读顺序
 
@@ -116,13 +116,13 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线已完成，外部仓库设置待单独授权；P1～P6 均未实现。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
+P0 本地基线及 P1 已完成，外部仓库设置待单独授权；P2～P6 均未实现。实际开发时一次只推进可验证的小范围，阶段完成后更新交接记录。
 
 ### P0：建立可信开发基线
 
 - [x] 核查分支/remote/工作区，确认用户允许的改动范围。
 - [ ] 配置 upstream、确认 GitHub 默认 main；记录是否由用户完成。**本次未授权远程/GitHub 设置操作，保留为外部待办。**
-- [x] 在功能分支 `feature/multi-address` 开发，未提交，HEAD 仍为 `2e5f1013`。
+- [x] 在功能分支 `feature/multi-address` 开发；P0 时 HEAD 为 `2e5f1013`，随后文档按用户要求提交并推送为 `dd145355`。
 - [x] 安装锁文件依赖，记录 Node `v24.22.1` / pnpm `10.34.9`，package.json 与锁文件无变化。
 - [x] 在未改功能前运行 Lint、Vitest、生产构建，记录上游已有失败。
 - [x] 创建仅包含虚构域名的开发配置，启用原生密码登录，以 standalone HTTP 实例验证基线。
@@ -149,13 +149,33 @@ Vitest 有两条既有嵌套 `vi.unmock` 提升警告，位于 `src/utils/proxy/
 
 ### P1：纯配置模型与解析
 
-- [ ] 新建 `src/utils/network/config.js`、`resolver.js` 及测试。
-- [ ] 按 SPEC 实现启用规则、保留 default、ID/label/地址校验和脱敏诊断。
-- [ ] 实现不可变地址选择、fallback 和菜单候选。
-- [ ] 接入服务响应清洗，确保 SSR 和 API 同源，覆盖嵌套服务。
-- [ ] 不改 Widget 白名单、不直接将警告塞进现有 validate 错误数组。
+- [x] 新建 `src/utils/network/config.js`、`resolver.js` 及测试。
+- [x] 按 SPEC 实现启用规则、保留 default、ID/label/地址校验和脱敏诊断。
+- [x] 实现不可变地址选择、fallback 和菜单候选。
+- [x] 接入服务响应清洗，确保 SSR 和 API 同源，覆盖嵌套服务。
+- [x] 不改 Widget 白名单、不直接将警告塞进现有 validate 错误数组。
 
-验收：SPEC T01～T14 的纯逻辑与配置链路部分；没有 UI 也能证明解析正确。
+2026-11-05 P1 验收：SPEC T01～T14 的纯逻辑与配置链路部分已覆盖；T07 的真实链接/搜索、T14 的页面搜索派生等 UI 部分仍待后续阶段，不能将整张验收矩阵勾为完成。
+
+实际命令均使用 Node `v24.22.1`、`corepack pnpm@10.34.9`：
+
+| 检查            | 命令 / 结果                                                                                                                                                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 依赖            | `install --frozen-lockfile` 通过，package.json / 锁文件不变                                                                                                                                                                                           |
+| 聚焦回归        | `exec vitest run src/utils/network src/utils/config src/__tests__/pages/api/services/index.test.js src/__tests__/pages/index.test.jsx src/utils/auth.test.js src/proxy.test.js src/__tests__/pages/api/auth-boundary.test.js`：20 文件 / 400 测试通过 |
+| 完整回归        | `test`：577 文件 / 2071 测试通过，106.00 秒，比 P0 新增 169 项；两条原有 vi.unmock 警告未改                                                                                                                                                           |
+| Lint            | `lint` 通过                                                                                                                                                                                                                                           |
+| 覆盖率          | `exec vitest run src/utils/network src/utils/config/network-response.test.js --coverage --coverage.include='src/utils/network/*.js'`：169 测试通过；新模块行 100%、分支 99.23%、函数 100%                                                             |
+| 生产构建与 HTTP | `python3 config/p1-baseline/run-baseline.py` 执行 `build` 并用虚构多地址配置验证 standalone 的 SSR/API 同源过滤、原始 href、旧相对链接、其他扩展保留、Widget 密钥、认证/private cache 及非致命 validate，全部通过；仅监听 loopback，结束停止          |
+| 主动诊断与格式  | 7 个新增 JS 和本地 Python 脚本共 8 个 clean；api-response.js 保留 2 条既有 await 提示和 3 条既有规则警告，无新增错误；4 份更新文档 LSP 无答复（inconclusive）；代码 Prettier、Python py_compile 和 Markdown 静态检查通过                              |
+
+本地配置、复现脚本和证据副本位于 Git/Docker 已忽略的 `config/p1-baseline/`，原始日志为 `/tmp/homepage-p1-{install,focused,coverage,lint,test,build,smoke,server}.log`。脚本不持久化随机认证凭据或 Cookie，不依赖真实配置。
+
+开发中新增集成测试先遇到 Kubernetes 模块初始化读取虚构路径的问题，通过 mock 外部发现模块解决；随后按实际 Widget 白名单完整字段修正新测试预期，未改弱原有断言。最终聚焦及全量测试均通过。
+
+内部接口约定见 DESIGN：纯规范化不记录日志；server.js 仅缓存当前模块实例上一轮脱敏警告集合，不保存浏览器模式。不同路由构建包/进程可各自输出首次警告，不承诺全部署只输出一次。没有引入依赖或改动认证、发现语法、Widget 白名单、浏览器 UI、存储、Actions。
+
+未运行真实浏览器、OIDC、HTTPS/反代缓存验收；这些仍属后续阶段。当前 P1 改动未提交/推送，等待用户确认后才进入 P2。
 
 ### P2：Provider 与偏好恢复
 

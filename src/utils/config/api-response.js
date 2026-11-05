@@ -11,6 +11,7 @@ import {
 } from "utils/config/service-helpers";
 import { cleanWidgetGroups, widgetsFromConfig } from "utils/config/widget-helpers";
 import { loadYaml } from "utils/config/yaml";
+import { filterNetworkServiceGroups } from "utils/network/server";
 
 /**
  * Compares services by weight then by name.
@@ -251,5 +252,5 @@ export async function servicesResponse() {
   });
 
   const allGroups = [...sortedGroups.filter((g) => g), ...unsortedGroups];
-  return pruneEmptyGroups(allGroups);
+  return filterNetworkServiceGroups(pruneEmptyGroups(allGroups), initialSettings);
 }

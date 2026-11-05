@@ -24,11 +24,35 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：P0 本地开发基线已完成，多地址功能尚未实现
+## 当前状态：P1 配置模型、纯解析与响应过滤已完成，尚无多地址 UI
 
-2026-11-05 经用户授权执行 P0，当前位于 `feature/multi-address`，HEAD 仍为 `2e5f10134ae3961bb936d3e7c441f9a1f4a4bf4f`，未提交。原有 5 份规划文档仍为未跟踪文件，必须保留。
+当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`，HEAD 为 `dd14535503f19b37f5018903ba8e34a41ab1a9c9`。此前 5 份规划/P0 文档已按用户要求提交并推送；本轮 P1 改动尚未提交或推送，不自动沿用前次推送授权。
 
-实际验证：
+2026-11-05 P1 实际变更：
+
+- 新增 `src/utils/network/config.js`：全局配置规范化、服务地址校验、递归不可变响应过滤。
+- 新增 `src/utils/network/resolver.js`：地址来源、fallback、保留原生 hasLink 语义、有序菜单候选；没有 DOM、存储或网络请求。
+- 新增 `src/utils/network/server.js`：服务端脱敏诊断，通过现有 logger 输出并按上一轮诊断集合去重；不保存模式或服务列表。
+- `src/utils/config/api-response.js` 仅增加导入及最终响应过滤调用。SSR/API 共用过滤，不修改 Widget 白名单、认证、缓存、监控、发现语法或书签行为。
+- 新增 4 个测试文件（network 下 3 个、config 下 `network-response.test.js`），覆盖 SPEC T01～T14 的纯逻辑/配置链路部分；不代表卡片、搜索和恢复等 UI 已验收。
+- 扩展关闭/全局错误时不转发服务的 network 数据，保留原始 href 与其他扩展命名空间；启用时仅替换响应副本内经过校验的 addresses。无可用原始 href 的服务仍不启用多地址。
+
+P1 验证证据（Node `v24.22.1` / pnpm `10.34.9`）：
+
+- frozen install、Lint、生产构建全部通过，依赖声明与锁文件未变。
+- 聚焦配置/页面/认证/API 回归：20 文件、400 测试通过；完整 Vitest：577 文件、2071 测试通过（新增 169 项），耗时 106.00 秒；仅保留 P0 已有的两条 `vi.unmock` 警告。
+- 新模块聚焦覆盖率：行 100%，分支 99.23%，函数 100%；不以覆盖率代替功能验收。
+- `python3 config/p1-baseline/run-baseline.py`：带虚构多地址配置构建并启动 loopback standalone 实例，验证登录前首页/API/SSR 不泄漏默认及备用地址，登录后 SSR/API 相同、非法/带凭据候选不转发、默认 href 未改、Widget 密钥不泄漏、validate 不被非致命警告阻断、退出后受限。临时实例已停止。
+- 证据在被 Git/Docker 忽略的 `config/p1-baseline/evidence/`；测试脚本/配置也在同目录，随机认证凭据和 Cookie 只在内存。
+- 主动 LSP 检查 13 个文件：7 个新增 JS 及本地 Python 脚本共 8 个 clean；唯一接入文件仍有 2 条既有无效 await 提示及 3 条既有静态规则警告，无新增错误。4 份更新文档无语言服务答复（inconclusive），不能记为 LSP 通过。Prettier 代码检查、Python py_compile 和 Markdown 换行/尾空白/围栏/本地链接检查通过。
+
+未完成：P2 Provider/偏好恢复、P3 链接与搜索/UI、P4 菜单、P5 完整浏览器/反代验收、P6 CI/CD。P0 外部仓库设置仍待单独授权。本轮未进入 P2、未提交推送、未发布部署。
+
+### P0 本地基线验证记录（历史）
+
+P0 验证时位于 `feature/multi-address`，当时 HEAD 为 `2e5f1013`，文档尚未提交；随后用户已授权提交并推送为 `dd145355`。
+
+P0 实际验证：
 
 - Node `v24.22.1` / Corepack `0.36.0` / pnpm `10.34.9`。通过 `corepack pnpm@10.34.9` 执行，没有增加 packageManager 字段、升级依赖或改写锁文件。
 - `corepack pnpm@10.34.9 install --frozen-lockfile`：通过。
@@ -39,7 +63,7 @@
 - 配置、脚本及证据位于 `config/p0-baseline/`，被 Git 忽略且被 Docker context 排除。仅使用 `.invalid` 虚构域名；随机密码、认证密钥和 Cookie 仅在验证进程内存中，不写文件或日志。
 - 本地 Python 验证脚本主动 LSP 检查：1 个文件 clean、0 条诊断；`py_compile` 通过。5 份规划文档的换行、尾部空白、代码围栏与本地链接检查通过；更新的 `agent.md`、`DESIGN.md`、`DEVELOPMENT.md` 主动 LSP 均未收到语言服务答复（inconclusive），不能记为 LSP 通过。业务源码未修改。
 
-未执行：添加 upstream、联网确认/修改 GitHub 默认分支与保护规则（需要额外授权）；真实浏览器交互、OIDC、HTTPS/反向代理/CDN 验收（本次仅 HTTP 基线，不能视为 SPEC 全量验收）。当前未发现失败基线，未进入 P1，未提交、推送、发布或部署。
+未执行：添加 upstream、联网确认/修改 GitHub 默认分支与保护规则（需要额外授权）；真实浏览器交互、OIDC、HTTPS/反向代理/CDN 验收（本次仅 HTTP 基线，不能视为 SPEC 全量验收）。P0 结束时未发现失败基线，当时未进入 P1、未提交、推送、发布或部署；后续状态以上方 P1 记录为准。
 
 ### 初始规划文档交付记录（保留历史）
 
@@ -57,7 +81,7 @@
 
 本轮文档校验：5 个文件的相互链接、已存在源码路径引用、结尾换行、尾部空白与代码围栏检查通过；4 段 YAML 及全部 JSON 示例解析通过。对 5 个 Markdown 文件的主动 LSP 检查均未得到语言服务有效答复，结果为 inconclusive，不能记为静态诊断通过。
 
-所有新增配置字段都是待实现能力，当前在 YAML 中填入不会自动获得设计中的界面。
+初始交付时所有新增字段均待实现；目前 P1 已提供解析与响应过滤，但在 YAML 中填入仍不会获得设计中的切换器或菜单，须完成后续阶段。
 
 ## 初始核查快照（2026-11-05）
 
@@ -72,11 +96,13 @@
 
 ## 建议下一步
 
-本地 P0 基线已建立，等待用户确认进入 **P1：纯配置模型和解析测试**：
+P1 已建立解析与配置响应合同，下一步经用户确认进入 **P2：Provider 与偏好恢复**：
 
-1. 在现有 `feature/multi-address` 分支新增纯配置规范化、地址解析及测试，按 SPEC 覆盖 T01～T14 的相关部分。
-2. 将新增地址过滤接入共同服务响应链路，覆盖嵌套分组，不改认证、Widget 白名单或原始 href。
-3. 沿用 Node `v24.22.1` / pnpm `10.34.9`，完成聚焦测试、全量回归、Lint 和生产构建后更新交接。
+1. 新增安全 storage 适配器，使用 SPEC 固定 key/JSON 版本，不保存 URL。
+2. 页面级 NetworkProvider 接收真实 initialSettings，覆盖 SSR 首帧、ready、StrictMode、存储失败、多标签页与配置变化。
+3. 复用现有纯函数，不修改 SWR/服务器共享对象；无 Provider 时保持禁用，兼容旧测试。沿用 Node `v24.22.1` / pnpm `10.34.9`。
+
+内部约定：内置 default 的 `label: null` 留给 UI i18n；菜单候选为 `{ id, label, href, current }`，fallback 说明使用解析结果；ready 抑制由 P2/P3 实现，不能混入纯解析器。
 
 P0 外部仓库设置仍单独待授权；不能将本地旧 `origin/HEAD -> origin/dev` 当成 GitHub 实时默认分支。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
 
