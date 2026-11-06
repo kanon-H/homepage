@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 CI 基础已本地实现，远程 Actions/保护门禁、上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
+> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查/合并门禁、上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
 
 ## 1. 阅读顺序
 
@@ -123,7 +123,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题仍未完成；P6 已开始并本地实现 CI 基础，远程运行/必需 CI 绑定及同步/发布仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
+P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题仍未完成；P6 CI 基础已提交推送且 PR 真实运行通过，必需 CI 绑定及同步/发布仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
 
 ### P0：建立可信开发基线
 
@@ -344,7 +344,8 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 ### P6：专用 CI/CD 与上游集成
 
 - [x] 本地实现自有 PR 测试工作流，精确 Node/pnpm、frozen lockfile、Lint/完整测试/隔离生产构建；只读权限，29 项策略/脚本测试通过，详见 10.2。
-- [ ] 功能分支提交/推送已获用户随后授权，结果以 Git log/远程为准；创建 PR 并验证真实 Actions 仍待另行授权，随后将实际检查名/来源绑定 main 的必需检查并验证门禁。P0 的 required_status_checks=null 未改变，本地通过不等于完成本项。
+- [x] 功能分支已推送 12116208；本 Fork Draft PR #1 和真实 Fork CI run 42205861009 已创建/运行，全部步骤 success，见 10.2。
+- [ ] 将远程确认的 `Fork verification` / github-actions App 15368 绑定到 main 必需检查并验证门禁，仍待另行授权。required_status_checks=null 未改变，CI 通过不等于分支门禁已配置。
 - [ ] 上游 main 定期集成 PR，保留历史、冲突停止并通知。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。
@@ -501,7 +502,7 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 
 调度任务依赖 GitHub 默认分支及 Actions 设置，公开 Fork 还可能有启用/闲置限制。GitHub 设置是外部待办，不能在本地写了 YAML 就宣称完成。
 
-## 10. 自有 CI 与镜像发布（CI 基础本地完成，发布待开发）
+## 10. 自有 CI 与镜像发布（PR CI 已通过，门禁待授权、发布待开发）
 
 ### 10.1 已发现的上游适配点
 
@@ -516,11 +517,11 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 
 | 文件与状态                       | 触发                           | 职责                                               |
 | -------------------------------- | ------------------------------ | -------------------------------------------------- |
-| `fork-ci.yml`（本地实现）        | main 的 PR / main push / 手动  | frozen install、Lint、Vitest、生产构建；无发布权限 |
+| `fork-ci.yml`（PR 验证通过）     | main 的 PR / main push / 手动  | frozen install、Lint、Vitest、生产构建；无发布权限 |
 | `fork-upstream-sync.yml`（计划） | schedule / 手动                | 上游 merge 和更新 PR，不直接部署                   |
 | `fork-release.yml`（计划）       | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                  |
 
-`fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。实际必需检查名及 GitHub App 来源尚待远程读取，不凭 YAML 绑定。
+`fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。已从真实 check_run 读取检查名 `Fork verification`、github-actions App ID 15368；本轮未写入 main 保护，不能把存在绿色检查当作已绑定必需检查。
 
 `scripts/fork-ci-build.sh` 构建启用多地址扩展的虚构配置，临时目录成功/失败均清理，原生密码认证变量随机生成且只在进程环境；不访问用户 config，不开服务或浏览器。Next.js 会另外自动加载环境文件，因此检测到 .env / .env.local / .env.production / .env.production.local（含符号链接）时直接拒绝，不删除用户文件；本地应在无这些文件的干净 checkout 运行。脚本需要 Bash、Node、pnpm，CI 使用固定版本工具；本机用忽略目录里的 pnpm wrapper 调用既有 Corepack，不安装全局工具。
 
@@ -539,7 +540,11 @@ PATH="$PWD/config/p6-baseline/bin:$PATH" RUNNER_TEMP="$PWD/config/p6-baseline" \
 
 安装、Lint、29 项聚焦测试、584 文件/2258 项完整测试和实际生产构建通过；29 项中构建隔离用 mock pnpm，不冒充生产构建。仅两条已有 vi.unmock 警告，依赖/锁文件未变。修改前基线 Lint、583 文件/2229 项测试通过。日志在忽略的 config/p6-baseline/evidence/；wrapper 不是交付依赖，其他有固定版本 pnpm 的环境直接运行脚本。js-yaml 5.5 拒绝原 Crowdin paths flow-list 的缩进，本轮改为等价 block-list，未改变路径。提交前另核对了既有 YAML/Shell 格式化变化，并复跑聚焦策略/隔离测试和 Bash 语法检查；未将格式化后的文件误称为此前相同 SHA256 的产物，补充记录在本地证据目录。
 
-远程限制：本轮已获随后明确授权提交/推送功能分支，实际结果以 Git log/远程为准；尚未建 PR，无真实 Fork CI 运行/必需检查门禁证据，上游 job 门禁尚未合入 main。pull_request_target 读取 base/main，首次 PR 可能仍受旧关闭/标记机器人影响，应先核查，必要时另行授权暂停指定旧工作流，不能自动修改外部设置。main 上 required_status_checks 仍为 null。shell PATH 未发现 Docker/Podman/actionlint/zizmor；但主动诊断实际调用了托管 zizmor，不能据 PATH 推断全部工具不可用。新工作流、Shell 脚本和 JS 测试分别 confirmed clean；10 份 YAML 中 3 份 confirmed clean、7 份保留原触发器/checkout 的既有诊断：Crowdin/Lint/Tests 的 3 项 artipacked，PR Quality/PR Triage/Reaction Comments/Release Drafter 的 4 项 dangerous-triggers。本轮仅加官方仓库门禁，不改其上游行为；这些诊断记录为 defer（不是 false-positive，不写 suppress），不称继承工作流全 clean。3 份 Markdown 无语言服务答复，记 inconclusive。未下载工具、未取得独立 actionlint 命令证据；未做镜像构建、GHCR 拉取或回滚。静态/托管诊断不代替 GitHub runner 实跑。
+2026-11-06 远程实证：用户授权执行下一步后，在 `kanon-H/homepage` 创建 [Draft PR #1](https://github.com/kanon-H/homepage/pull/1)，head=`1211620882e860bb64cc621ed3d7e62a984ad552`、base=本 Fork main；不是向官方提交。[Fork CI run 42205861009](https://github.com/kanon-H/homepage/actions/runs/42205861009) 第 1 次完成 success；全部步骤成功，job 日志明确为 584 文件/2258 项测试及生产编译成功。日志确认实际 checkout 的 PR 合并快照为 `01198d99b6bb75b81c2fbd3c6ff194aa59a28344`，不是实际合入 main。check_run 127852191491 的 name=`Fork verification`、app=`github-actions` / 15368，head_sha 正确关联 12116208。脱敏 API 快照/日志位于 Git/Docker 忽略的 `config/p6-remote/evidence/`，凭据只在内存，不转发给跨域日志下载地址。期间 GET 网络短暂失败后只读复查恢复，无重复建 PR、workflow 重跑或设置变更。
+
+远程限制：PR 保持 open/draft、merged=false、auto_merge=null；main 仍为 2e5f1013、required_status_checks=null，基础保护未改，门禁绑定须另行授权。本轮没有发布/部署、修改 Secrets 或启停工作流。旧 Lint/Tests/Docs 的 PR job 按官方条件 skipped；base/main 的 anti-slop、Auto Label PR 实际运行 success，未关闭 PR，但不能据此保证后续不干预。上游 job 门禁尚未合入 main。P5 排查仍暂停，不能将 CI 通过当完整人工验收。三份交接现已获用户随后明确提交/推送授权，仅推当前功能分支，结果以 Git log/远程为准；新 head 必须重新核实对应 CI，不套用本次 12116208 的绿色结果。
+
+静态检查边界（保留首次本地证据）：shell PATH 未发现 Docker/Podman/actionlint/zizmor；但主动诊断实际调用了托管 zizmor，不能据 PATH 推断全部工具不可用。新工作流、Shell 脚本和 JS 测试分别 confirmed clean；10 份 YAML 中 3 份 confirmed clean、7 份保留原触发器/checkout 的既有诊断：Crowdin/Lint/Tests 的 3 项 artipacked，PR Quality/PR Triage/Reaction Comments/Release Drafter 的 4 项 dangerous-triggers。本轮仅加官方仓库门禁，不改其上游行为；这些诊断记录为 defer（不是 false-positive，不写 suppress），不称继承工作流全 clean。3 份 Markdown 无语言服务答复，记 inconclusive。未下载工具、未取得独立 actionlint 命令证据；未做镜像构建、GHCR 拉取或回滚。静态/托管诊断不代替 GitHub runner 实跑。
 
 ### 10.3 构建路径必须二选一且验证
 

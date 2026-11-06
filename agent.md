@@ -24,11 +24,22 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：P6 CI 基础已本地实现；远程验证待授权，P5 排查继续暂停
+## 当前状态：Fork 草稿 PR 已创建，真实 CI 通过；main 门禁待授权，P5 排查暂停
 
-用户现已明确要求开始 P6 开发。本轮从 `feature/multi-address@9b1eeeaceaf4279cbe5a8d71d9205ca6adcad476` 的干净工作区开始，实现独立 Fork CI 和本地验证。用户随后明确要求“代码提交到远程git”，本轮据此仅将 P6 源码/交接提交并推送当前功能分支，结果以 Git log 和远程引用为准；不建 PR、不修改 GitHub 设置、不合入 main、不发布或部署。P5 手机兼容排查没有恢复。
+P6 基础已提交/推送为 `1211620882e860bb64cc621ed3d7e62a984ad552`。用户随后授权“执行下一步”，本轮只在个人 Fork 创建 Draft PR 并验证真实 CI，不合并、不发布/部署，不修改分支保护、Secrets 或工作流设置。P5 手机兼容排查没有恢复。用户随后明确授权“提交推送”，本次仅提交/推送三份交接文档至当前功能分支，结果以 Git log 和远程引用为准；新 head 的 CI 需另行核实，不能套用 12116208 的结果。
 
-### P6 第一小步：Fork CI 基础（本地完成，远程未运行）
+### P6 第二小步：Fork PR 与真实 CI（2026-11-06 已验证）
+
+- [PR #1](https://github.com/kanon-H/homepage/pull/1)：`kanon-H/homepage:feature/multi-address → kanon-H/homepage:main`，不是向官方提交。保持 open/draft、merged=false、auto_merge=null；正文明确 AI 辅助及 P5 未完成项，不冒充完整 v1 验收。
+- [Fork CI run 42205861009](https://github.com/kanon-H/homepage/actions/runs/42205861009) 第一次运行完成 success；工具版本/SHA 核对、frozen install、Lint、584 文件/2258 测试、隔离生产构建及清理步骤全部 success。测试数量与生产编译成功也由实际 job 日志核实，不是沿用本地报告推断。
+- PR/head 为 `1211620882e860bb64cc621ed3d7e62a984ad552`；job 日志确认实际 checkout/测试的是 GitHub PR 合并快照 `01198d99b6bb75b81c2fbd3c6ff194aa59a28344`。这是 refs/pull 的测试快照，不代表已合入 main。
+- 真实 check_run `127852191491`：name=`Fork verification`，app=`github-actions` / ID `15368`，head_sha=`12116208…`，completed/success。未来绑定 main 使用远程确认的检查名/App，不能把显示路径 `Fork CI / Fork verification` 随意当成另一个 context。
+- API 复核 main 仍为 `2e5f10134ae3961bb936d3e7c441f9a1f4a4bf4f`，required_status_checks=null；管理员约束、禁止强推/删除等基础保护保持原状。本轮没有保护规则/Actions 设置/Secrets 写入，没有重新跑 workflow 或发布镜像。
+- Actions 已启用、默认 token 为 read，现有凭据仅内存调用 API。旧 Lint/Tests/Docs 的 PR job 按官方条件 skipped；base/main 的 anti-slop 与 Auto Label PR 实际运行 success，未关闭 PR，未擅自暂停机器人。这不是保证以后都不会干预。
+- API GET 一度网络失败，仅只读复查后恢复，无重复建 PR。脱敏快照和 job 日志仅在 Git/Docker 忽略的 `config/p6-remote/evidence/`；不向下载日志的跨域签名地址转发 GitHub 凭据。
+- 下一步仍需另行授权绑定 main 必需检查并验证门禁；P5 剩余验收、同步、镜像发布和回滚未完成。后续若提交新源码/文档，必须核查新 head 的 CI，不能继续套用这次 12116208 的绿色结果。
+
+### P6 第一小步：Fork CI 基础（历史实施记录；当前以上方为准）
 
 - 新增 `.github/workflows/fork-ci.yml`：仅本 Fork 的 main PR、main push、手动触发；固定 Ubuntu 24.04 / Node `24.22.1` / pnpm `10.34.9`，按顺序 frozen install、Lint、Vitest、生产构建。单 Job 名为 `Fork verification`，真实必需检查名称/来源仍须远程读取确认，尚未绑定保护规则。
 - CI 只有 contents: read；Actions 使用上游已有完整 SHA，checkout 使用事件的确切 SHA 并核对 HEAD，persist-credentials=false；不读取自定义 Secrets，无 Codecov、共享缓存、产物上传、镜像登录或发布权限。构建失败不会 continue-on-error。
@@ -214,7 +225,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-P6 已授权开始，CI 基础已本地实现。本轮已获明确提交/推送授权，下一最小任务是另行授权创建 main PR，验证真实 Actions 的 head_sha、检查名和结果，再绑定 main 必需检查并验证门禁；不直接合入功能或发镜像。首次 PR 的旧 pull_request_target 机器人及 Actions 是否启用须先核查，写设置另行授权。之后再开发/验证上游同步、可信发布和回滚。P5 手机排查仍暂停，下列 P5 路线仅在用户选择恢复时使用：
+Fork Draft PR #1 已创建，12116208 的真实 CI 通过。下一最小任务是另行授权将 `Fork verification`（github-actions App 15368）绑定到本 Fork main 必需检查并验证门禁；本轮没有这项设置写入授权，不直接合并或发布。合并前仍需明确处理 P5 未完成门禁；之后再开发/验证上游同步、可信发布和回滚。本轮三份交接更新已获随后明确提交/推送授权，结果以 Git log/远程为准；提交新 head 后需等待对应 CI。P5 手机排查仍暂停，下列 P5 路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
