@@ -1,8 +1,8 @@
-name: 'Repository Maintenance'
+name: "Repository Maintenance"
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 permissions: {}
@@ -12,7 +12,8 @@ concurrency:
 
 jobs:
   stale:
-    name: 'Stale'
+    name: "Stale"
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -29,7 +30,8 @@ jobs:
             recent activity. It will be closed if no further activity occurs. Thank you
             for your contributions. See our [contributing guidelines](https://github.com/gethomepage/homepage/blob/main/CONTRIBUTING.md#automatic-respoistory-maintenance) for more details.
   lock-threads:
-    name: 'Lock Old Threads'
+    name: "Lock Old Threads"
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-latest
     permissions:
       discussions: write
@@ -38,9 +40,9 @@ jobs:
     steps:
       - uses: dessant/lock-threads@89ae32b08ed1a541efecbab17912962a5e38981c # v6.0.2
         with:
-          issue-inactive-days: '30'
-          pr-inactive-days: '30'
-          discussion-inactive-days: '30'
+          issue-inactive-days: "30"
+          pr-inactive-days: "30"
+          discussion-inactive-days: "30"
           log-output: true
           issue-comment: >
             This issue has been automatically locked since there
@@ -58,7 +60,8 @@ jobs:
             Please open a new discussion for related concerns.
             See our [contributing guidelines](https://github.com/gethomepage/homepage/blob/main/CONTRIBUTING.md#automatic-repository-maintenance) for more details.
   close-answered-discussions:
-    name: 'Close Answered Discussions'
+    name: "Close Answered Discussions"
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-latest
     permissions:
       discussions: write
@@ -116,7 +119,8 @@ jobs:
               await sleep(1000)
             }
   close-outdated-discussions:
-    name: 'Close Outdated Discussions'
+    name: "Close Outdated Discussions"
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-latest
     permissions:
       discussions: write
@@ -209,7 +213,8 @@ jobs:
               }
             }
   close-unsupported-feature-requests:
-    name: 'Close Unsupported Feature Requests'
+    name: "Close Unsupported Feature Requests"
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-latest
     permissions:
       discussions: write

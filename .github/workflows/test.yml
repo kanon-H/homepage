@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   vitest:
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

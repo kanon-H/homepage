@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成，P6 未执行。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
+> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 CI 基础已本地实现，远程 Actions/保护门禁、上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
 
 ## 1. 阅读顺序
 
@@ -86,7 +86,7 @@ P0 元数据配置时没有移动任何分支提交：main/origin/main/upstream/
 
 锁文件格式是 9.0，不代表必须用 pnpm 9。二开专用 CI 建议验证后统一到一个固定的 pnpm 10 补丁版本和 Node 24；版本在选型验证前不能写成“已经固定”。不要无故升级上游全部依赖或重写锁文件。
 
-初始核查时只有 Node 和 corepack，没有 pnpm 和 node_modules。2026-11-05 的 P0 已验证 Node `v24.22.1` / Corepack `0.36.0` / pnpm `10.34.9`，后续开发使用 `corepack pnpm@10.34.9 <命令>`；当前未修改 package.json 或上游 CI，不能声称 CI 已统一版本。
+初始核查时只有 Node 和 corepack，没有 pnpm 和 node_modules。2026-11-05 的 P0 已验证 Node `v24.22.1` / Corepack `0.36.0` / pnpm `10.34.9`，后续开发使用 `corepack pnpm@10.34.9 <命令>`。P6 新增的 fork-ci.yml 已固定 Node `24.22.1` / pnpm `10.34.9`；继承工作流只加官方仓库门禁，工具选择未改，package.json / 锁文件未改。固定版本的文件已本地验证，远程运行仍未验证，不能声称全部上游 CI 或 Docker 构建已统一。
 
 首次建立环境时，可先以 Corepack 试运行：
 
@@ -123,7 +123,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题和 P6（含必需 CI 绑定）仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
+P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题仍未完成；P6 已开始并本地实现 CI 基础，远程运行/必需 CI 绑定及同步/发布仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
 
 ### P0：建立可信开发基线
 
@@ -343,8 +343,8 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 
 ### P6：专用 CI/CD 与上游集成
 
-- [ ] 自有 PR 测试工作流，精确工具版本、frozen lockfile。
-- [ ] CI 实际运行验证后，将真实检查名绑定 main 的必需检查并验证门禁；P0 的 required_status_checks=null 尚未完成本项。
+- [x] 本地实现自有 PR 测试工作流，精确 Node/pnpm、frozen lockfile、Lint/完整测试/隔离生产构建；只读权限，29 项策略/脚本测试通过，详见 10.2。
+- [ ] 功能分支提交/推送已获用户随后授权，结果以 Git log/远程为准；创建 PR 并验证真实 Actions 仍待另行授权，随后将实际检查名/来源绑定 main 的必需检查并验证门禁。P0 的 required_status_checks=null 未改变，本地通过不等于完成本项。
 - [ ] 上游 main 定期集成 PR，保留历史、冲突停止并通知。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。
@@ -497,34 +497,57 @@ git merge --no-ff upstream/main
 
 **事件触发陷阱：** 用默认 `GITHUB_TOKEN` 推送/创建 PR 通常不会像人工推送那样触发后续普通 push/PR 工作流。必须在设计时解决：例如显式调用可信的 reusable/workflow_dispatch 测试入口，或采用权限受限的 GitHub App token。不能看到 PR 已创建就认为必需 CI 会自动执行；使用 PAT/App 需要用户配置和授权，绝不写进仓库。
 
+P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到同步分支，核对 run 的 head_sha/分支、实际检查归属和结论，并处理异步失败通知。dispatch 入口需先进入默认分支，调用权限/设置仍待同步阶段实现验证。仅让 main 上的 reusable job checkout 任意 source_sha，不会自动把 check_run 关联到该 SHA，不能据此称 PR 必需检查已满足；当前未新增这种易混淆入口。
+
 调度任务依赖 GitHub 默认分支及 Actions 设置，公开 Fork 还可能有启用/闲置限制。GitHub 设置是外部待办，不能在本地写了 YAML 就宣称完成。
 
-## 10. 自有 CI 与镜像发布设计（计划）
+## 10. 自有 CI 与镜像发布（CI 基础本地完成，发布待开发）
 
 ### 10.1 已发现的上游适配点
 
 - `docker-publish.yml` 的 build job 限定 `github.repository == 'gethomepage/homepage'`。
 - Docker PR 触发分支当前是 `dev`，不能假定 Fork main PR 会走这条构建。
 - `test.yml` 上报 Codecov 使用 Secret，且上传错误会导致失败；Fork 未配置服务时需要明确选择保留、条件执行或独立测试工作流。
-- 上游其他定时/issue/文档自动化未逐一适配，不能盲目全部启用。
+- 已逐一检查 11 份继承工作流：Docker/Docs 已有限定官方仓库的 job 条件，其余 9 份在本地补齐该条件；保留上游逻辑而不在 Fork 执行其 Codecov、翻译、关闭 PR/Issue 等自动化。
 - `Dockerfile` 的 `CI=true` 分支跳过安装和构建，要求上下文已有有效 `.next/standalone` 和 `.next/static`。
 - Dockerfile 当前许可证 label 为 `Apache-2.0`，而根 `LICENSE` 与 `CONTRIBUTING.md` 是 GPL v3。发布前核实并修正自有镜像元信息，不能照抄错误标签。
 
-### 10.2 推荐工作流拆分
+### 10.2 工作流拆分与 CI 基础实证
 
-| 文件（计划新增）         | 触发                           | 职责                                                   |
-| ------------------------ | ------------------------------ | ------------------------------------------------------ |
-| `fork-ci.yml`            | main 的 PR / main push / 手动  | frozen install、Lint、Vitest、生产构建；不登录镜像仓库 |
-| `fork-upstream-sync.yml` | schedule / 手动                | 上游 merge 和更新 PR，不直接部署                       |
-| `fork-release.yml`       | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                      |
+| 文件与状态                       | 触发                           | 职责                                               |
+| -------------------------------- | ------------------------------ | -------------------------------------------------- |
+| `fork-ci.yml`（本地实现）        | main 的 PR / main push / 手动  | frozen install、Lint、Vitest、生产构建；无发布权限 |
+| `fork-upstream-sync.yml`（计划） | schedule / 手动                | 上游 merge 和更新 PR，不直接部署                   |
+| `fork-release.yml`（计划）       | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                  |
 
-发布前确保现有上游工作流不会重复消耗资源或访问不属于 Fork 的外部服务。是否关闭/适配某项需基于实际检查，不在文档阶段修改。
+`fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。实际必需检查名及 GitHub App 来源尚待远程读取，不凭 YAML 绑定。
+
+`scripts/fork-ci-build.sh` 构建启用多地址扩展的虚构配置，临时目录成功/失败均清理，原生密码认证变量随机生成且只在进程环境；不访问用户 config，不开服务或浏览器。Next.js 会另外自动加载环境文件，因此检测到 .env / .env.local / .env.production / .env.production.local（含符号链接）时直接拒绝，不删除用户文件；本地应在无这些文件的干净 checkout 运行。脚本需要 Bash、Node、pnpm，CI 使用固定版本工具；本机用忽略目录里的 pnpm wrapper 调用既有 Corepack，不安装全局工具。
+
+本地验证（源码基线 9b1eeeac 加本轮工作区）：
+
+```bash
+corepack pnpm@10.34.9 install --frozen-lockfile
+corepack pnpm@10.34.9 lint
+corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows/fork-ci.test.js
+corepack pnpm@10.34.9 test
+bash -n scripts/fork-ci-build.sh
+# 本机 shell 没有 pnpm，通过忽略目录内的固定版本 wrapper 提供命令：
+PATH="$PWD/config/p6-baseline/bin:$PATH" RUNNER_TEMP="$PWD/config/p6-baseline" \
+  bash scripts/fork-ci-build.sh
+```
+
+安装、Lint、29 项聚焦测试、584 文件/2258 项完整测试和实际生产构建通过；29 项中构建隔离用 mock pnpm，不冒充生产构建。仅两条已有 vi.unmock 警告，依赖/锁文件未变。修改前基线 Lint、583 文件/2229 项测试通过。日志在忽略的 config/p6-baseline/evidence/；wrapper 不是交付依赖，其他有固定版本 pnpm 的环境直接运行脚本。js-yaml 5.5 拒绝原 Crowdin paths flow-list 的缩进，本轮改为等价 block-list，未改变路径。提交前另核对了既有 YAML/Shell 格式化变化，并复跑聚焦策略/隔离测试和 Bash 语法检查；未将格式化后的文件误称为此前相同 SHA256 的产物，补充记录在本地证据目录。
+
+远程限制：本轮已获随后明确授权提交/推送功能分支，实际结果以 Git log/远程为准；尚未建 PR，无真实 Fork CI 运行/必需检查门禁证据，上游 job 门禁尚未合入 main。pull_request_target 读取 base/main，首次 PR 可能仍受旧关闭/标记机器人影响，应先核查，必要时另行授权暂停指定旧工作流，不能自动修改外部设置。main 上 required_status_checks 仍为 null。shell PATH 未发现 Docker/Podman/actionlint/zizmor；但主动诊断实际调用了托管 zizmor，不能据 PATH 推断全部工具不可用。新工作流、Shell 脚本和 JS 测试分别 confirmed clean；10 份 YAML 中 3 份 confirmed clean、7 份保留原触发器/checkout 的既有诊断：Crowdin/Lint/Tests 的 3 项 artipacked，PR Quality/PR Triage/Reaction Comments/Release Drafter 的 4 项 dangerous-triggers。本轮仅加官方仓库门禁，不改其上游行为；这些诊断记录为 defer（不是 false-positive，不写 suppress），不称继承工作流全 clean。3 份 Markdown 无语言服务答复，记 inconclusive。未下载工具、未取得独立 actionlint 命令证据；未做镜像构建、GHCR 拉取或回滚。静态/托管诊断不代替 GitHub runner 实跑。
 
 ### 10.3 构建路径必须二选一且验证
 
 A. 在 CI 中安装/构建，确保 `.next` 产物进入 Docker build context，再传 `CI=true`。
 
 B. 让 Docker builder 正常安装/构建，不传 `CI=true`，但先解决 Dockerfile 中浮动 `pnpm@latest`，保证与锁定工具一致。
+
+当前 Fork CI 只验证应用构建，不上传 .next、不调用 Docker，因此尚未选择/证明 A 或 B，也不能把这次构建直接算作镜像发布验证。
 
 不能跳过宿主构建却传 `CI=true`，也不能假定另一个 Job 的文件自动存在。跨 Job 要上传/下载产物，跨架构依赖则要验证原生模块兼容；amd64 上构建的依赖不一定适用于 arm64。
 

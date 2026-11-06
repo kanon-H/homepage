@@ -10,7 +10,7 @@ permissions:
 jobs:
   close-needs-requirements:
     name: PRs Need Requirements
-    if: github.event.label.name == 'needs-requirements'
+    if: github.repository == 'gethomepage/homepage' && github.event.label.name == 'needs-requirements'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

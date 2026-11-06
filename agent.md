@@ -24,9 +24,21 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：P0 基础外部设置已补齐；P5 排查暂停，P6 未开始
+## 当前状态：P6 CI 基础已本地实现；远程验证待授权，P5 排查继续暂停
 
-当前位于 `feature/multi-address`，跟踪 `origin/feature/multi-address`，本轮 P0 文档提交前 HEAD 为 `d5ade7b6191a81cac023a41fc055c3713a75b2b5`，P5 脚本/文档已按上轮授权提交并推送。本轮 2026-11-06 用户另行授权补 P0，并确认“main＋基础保护”；P0 配置阶段仅操作 Git/GitHub 元数据及更新交接。用户随后明确授权提交现有成果，本次仅将三份 P0 交接文档提交/推送当前功能分支，结果以 Git log 和远程引用为准；不合入 main，不恢复 P5 排查、不开始 P6、不发布或生产部署。
+用户现已明确要求开始 P6 开发。本轮从 `feature/multi-address@9b1eeeaceaf4279cbe5a8d71d9205ca6adcad476` 的干净工作区开始，实现独立 Fork CI 和本地验证。用户随后明确要求“代码提交到远程git”，本轮据此仅将 P6 源码/交接提交并推送当前功能分支，结果以 Git log 和远程引用为准；不建 PR、不修改 GitHub 设置、不合入 main、不发布或部署。P5 手机兼容排查没有恢复。
+
+### P6 第一小步：Fork CI 基础（本地完成，远程未运行）
+
+- 新增 `.github/workflows/fork-ci.yml`：仅本 Fork 的 main PR、main push、手动触发；固定 Ubuntu 24.04 / Node `24.22.1` / pnpm `10.34.9`，按顺序 frozen install、Lint、Vitest、生产构建。单 Job 名为 `Fork verification`，真实必需检查名称/来源仍须远程读取确认，尚未绑定保护规则。
+- CI 只有 contents: read；Actions 使用上游已有完整 SHA，checkout 使用事件的确切 SHA 并核对 HEAD，persist-credentials=false；不读取自定义 Secrets，无 Codecov、共享缓存、产物上传、镜像登录或发布权限。构建失败不会 continue-on-error。
+- 新增 `scripts/fork-ci-build.sh`：随机临时目录中的虚构多地址 YAML、仅子进程环境中的随机密码/认证密钥，强制生产构建；成功和失败均清理临时配置。检测到 Next.js 会自动加载的 `.env` / `.env.local` / `.env.production` / `.env.production.local`（含符号链接）时拒绝，不删除用户文件。不启动实例或浏览器，不依赖 config 下的私有基线工具。
+- 9 份继承工作流仅增加官方仓库 job 门禁，阻止 Fork 重复跑原测试/Codecov、Crowdin、PR/Issue 关闭机器人、Release Drafter 等；既有 Docker/Docs 已有官方条件，保持不动。Crowdin 的原 paths flow-list 被 js-yaml 5.5 拒绝，改为等价 block-list，路径值不变。本轮现获授权随 P6 提交推送这些门禁；尤其 pull_request_target 仍读取 base/main，首次 PR 前可能须另行授权暂停旧机器人，不能认为功能分支的改动已经改变 main 的远程行为。
+- 新增 `src/__tests__/workflows/fork-ci.test.js`，29 项测试覆盖触发/权限/版本/源 SHA、全部 11 份上游工作流 job 条件，以及 mock pnpm 下的配置/认证隔离、失败退出码、清理和 4 种 .env 拒绝。mock 测试不算实际生产构建。
+- 本地 frozen install、修改前 Lint/583 文件/2229 测试通过；修改后 Lint、584 文件/2258 测试及实际 `bash scripts/fork-ci-build.sh` 生产构建通过。仅两条已有 vi.unmock 警告；未改业务、认证、依赖/锁文件、Dockerfile 或本地 Git/GitHub 设置。命令与证据见 DEVELOPMENT 第 10 节及忽略的 `config/p6-baseline/evidence/`。
+- 不新增 source_sha 复用入口：checkout 另一个 SHA 不会自动改变 GitHub check_run 所属提交。后续同步拟显式 dispatch CI 到同步分支，核对实际 head_sha、分支和运行结果；当前未实现同步工作流，也未解决/宣称已解决真实 PR 的检查门禁。
+- 新工作流、Shell 脚本和 JS 测试分别主动诊断 confirmed clean；继承工作流保留 7 项既有 zizmor 诊断（3 项 checkout 凭据持久化、4 项危险触发器），均明确 defer 而非 false-positive/suppress，未改上游触发器或添加忽略。Fork 通过 job 条件跳过这些自动化；3 份 Markdown 无语言服务答复，不算 clean。
+- shell PATH 未发现 Docker/Podman/actionlint/zizmor，但主动诊断实际调用了托管 zizmor；不再把 PATH 未找到误写成工具完全不可用。未下载工具，未取得独立 actionlint 命令证据。远程 Actions、main 必需检查、上游同步、双架构镜像/可信标签、GHCR 和回滚实演均未完成。本轮不重跑 P5 浏览器/物理手机，不表示完整 v1 已验收。
 
 ### 2026-11-06 P0 基础外部设置（已验证）
 
@@ -39,7 +51,7 @@
 - 复用现有仓库 Git 凭据，仅在内存使用 API 认证，无新凭据或安装工具。初次 GitHub PATCH 返回 500；先用 API/传输确认仍是 dev/未保护，再原样重试成功，未盲目覆盖现有规则。脱敏审计在 Git/Docker 忽略的 `config/p0-external/evidence/`，不提交凭据或原始配置。
 - 上轮手工测试实例已按原期限自动停止（status=expired，监听已消失）；未重启/续期，手机兼容排查继续暂停。
 
-### P5 已交付与未完成记录
+### P5 已交付与未完成记录（历史交接；当前 P6 以上方为准）
 
 2026-11-05 人工验收实例已启动：用户明确选择局域网直连；复用现有 standalone，仅绑定所选内网 IPv4 与独立端口，启用随机临时密码/认证密钥及严格 Host 校验，使用独立虚构服务/书签配置，不动生产服务、系统防火墙或代理。地址、PID 和到期状态仅在 Git/Docker 忽略的 `config/p5-manual/session-20261105T215005-0e6ff5/status.json`，不在本文记录真实地址或凭据。两小时 watchdog 到 UTC+8 23:50:05 自动停止；本机 HTTP 已验证匿名隔离、原生登录/退出、PNG 图标、配置校验、private/no-store 和非法 Host 拒绝，用户已确认客户端可打开并登录，8 项基础桌面操作正常，详细结果见下方；其余未覆盖人工场景仍待。停止时向该 status.json 中的 supervisor PID 发 SIGTERM 前须再次核对进程身份，不杀其他服务；临时密码不落配置/日志。
 
@@ -202,7 +214,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-P0 基础外部已补齐，P5 手机排查按用户选择暂停，不自动恢复；P6 尚未授权开始。以下 P5 路线仅供用户选择恢复时使用，若用户授权 P6，则先建立真实 CI 并绑定 main 保护，再分别处理上游同步/发布：
+P6 已授权开始，CI 基础已本地实现。本轮已获明确提交/推送授权，下一最小任务是另行授权创建 main PR，验证真实 Actions 的 head_sha、检查名和结果，再绑定 main 必需检查并验证门禁；不直接合入功能或发镜像。首次 PR 的旧 pull_request_target 机器人及 Actions 是否启用须先核查，写设置另行授权。之后再开发/验证上游同步、可信发布和回滚。P5 手机排查仍暂停，下列 P5 路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
