@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查尚未绑定，同步/发布待实现验证，不表示扩展整体已验收。
+> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查已绑定并核对正例，负例演练、同步/发布仍待完成，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -348,7 +348,7 @@ gethomepage/homepage main
 
 自有镜像建议先使用 `ghcr.io/kanon-h/homepage`，仓库路径小写。自有标签建议 `fork-v0.1.0` 一类，与上游 `v2.7.0` 标签区分；版本元信息记录自有版本、上游基线、源码 SHA、构建时间。
 
-上游 `docker-publish.yml` 有官方仓库条件，Fork 不能直接发布。P6 第一小步已新增 `.github/workflows/fork-ci.yml`，只在本 Fork 对 main PR/main push/手动事件执行只读测试与生产构建；固定 Node `24.22.1`、pnpm `10.34.9`，不发布/上传产物，不作为已完成的 Docker 构建路径。`scripts/fork-ci-build.sh` 使用临时虚构配置及随机认证变量，并拒绝自动加载本地生产 .env 文件。其余继承工作流已补齐官方仓库 job 条件并推送为 `12116208`。现已在本 Fork 创建 [Draft PR #1](https://github.com/kanon-H/homepage/pull/1)，真实 Fork CI 通过；main 中的生效仍须另行授权合并，pull_request_target 尤其依赖 base 分支版本。
+上游 `docker-publish.yml` 有官方仓库条件，Fork 不能直接发布。P6 第一小步已新增 `.github/workflows/fork-ci.yml`，只在本 Fork 对 main PR/main push/手动事件执行只读测试与生产构建；固定 Node `24.22.1`、pnpm `10.34.9`，不发布/上传产物，不作为已完成的 Docker 构建路径。`scripts/fork-ci-build.sh` 使用临时虚构配置及随机认证变量，并拒绝自动加载本地生产 .env 文件。其余继承工作流已补齐官方仓库 job 条件并推送为 `12116208`。现已在本 Fork 创建 [Draft PR #1](https://github.com/kanon-H/homepage/pull/1)，最新 8e633e62 的真实 Fork CI 已通过。main 的必需检查现已通过 GitHub API 配置为 `Fork verification` / github-actions App 15368、strict=true，其他保护原值不变；这是保护元数据生效，不是代码已合入 main，继承工作流条件的 main 版本仍须另行授权合并，pull_request_target 尤其依赖 base 分支版本。
 
 同步与自有镜像工作流仍待实现。后续同步必须验证 CI 检查真实关联到 PR head；仅在 main 工作流中 checkout 另一 SHA，不会改变 check_run 的归属，不可冒充 PR 门禁。专用工作流、权限、回滚和构建陷阱见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -366,4 +366,5 @@ gethomepage/homepage main
 - 用户已在 macOS 电脑 / Chrome `155.0.8059.85`、Edge `154.0.4258.37`（均正式版 arm64）确认 8 项基础桌面操作正常，包含 Cmd、原生右键/Shift、上下键/Escape、缩窄布局及 HTTP 复制失败。手工中键因无该按钮而未执行，OS 具体版本/viewport 未提供；完整键盘焦点、Widget统计、物理触屏、OIDC（如使用）及目标反代/CDN 仍需补验。自动化不替代 SPEC 的手工完成定义，P5 完整验收及 v1 尚未完成。
 - 物理手机基础触屏/布局已有用户反馈；华为浏览器报告新标签，红米小米浏览器 `v20.28.1020918`、红米/鸿蒙手机 QQ 报告原页打开。用户以标签数不变确认真实替换；配置及 live Chromium 探针仍为 `_blank`，不能仅归因于 OS 或设置。用户已暂停排查，不添加未经验证的强制导航补丁，不将该差异记为通过。
 - P0 基础外部已完成：新增官方 upstream 仅跟踪 main，来源 `2e5f1013` 与基线相同；Fork 默认改 main，本地 origin/HEAD 同步；main 要求 PR、零强制审批、管理员受约束、禁止强推/删除，保留 merge commit。官方默认仍 dev，不影响明确使用其 main 来源。没有合并或移动分支代码，二开仍在功能分支。
-- 必需 CI 检查尚未绑定，用户确认由 P6 建立并验证实际 CI 后绑定；不是已完成的 CI 门禁。P0 交接已提交推送为 `9b1eeeac`，用户随后授权开始 P6，当前在该基线上本地新增只读 CI、隔离构建脚本和 29 项策略/脚本测试，9 份上游工作流仅补官方 job 条件及 Crowdin 等价 YAML 格式修正。frozen install、Lint、584 文件/2258 测试及生产构建通过，无业务/认证/依赖/锁文件改动。成果已提交/推送为 `12116208`，随后按用户授权创建本 Fork Draft PR #1；[真实 Fork CI](https://github.com/kanon-H/homepage/actions/runs/42205861009) 完成 success，远程日志确认 584 文件/2258 测试及生产构建通过。check=`Fork verification`、github-actions App ID=15368，关联 head 12116208，实际测试 PR 合并快照 01198d99。main 仍为 2e5f1013、required_status_checks=null；没有合并、绑定保护、修改 Secrets、发布或部署。三份交接现按用户随后授权提交/推送功能分支，结果以 Git log/远程为准，新 head CI 需重新核实；P6 完整门禁、同步/镜像及回滚仍待完成，最新记录见 [agent.md](agent.md)。
+- P6 只读 CI 基础/隔离构建脚本/29 项策略测试已提交为 `12116208`，交接为 `8e633e62`。[最新 Fork CI](https://github.com/kanon-H/homepage/actions/runs/42209452117) 针对 8e633e62 成功，实际 job 日志确认 584 文件/2258 测试及生产构建通过，测试 PR 快照为 7101527c；check_run 127864197191 的名称/来源/源码均已核实。
+- 用户本轮授权后，main 已绑定 `Fork verification`、github-actions App 15368、strict=true，完整保护与独立接口均已读回，其余字段逐项比较不变。局部 PATCH 因尚未启用返回 404；确认无改动后按原保护完整保留 PUT 首次启用，没有盲重试或弱化规则。main 仍为 2e5f1013、PR #1 为 Draft/未合并，没有修改 Secrets、发布或部署。失败/缺失检查的负例未演练，P6 完整门禁、同步/镜像及回滚仍待完成。三份交接现按用户随后授权仅本地提交，结果以 Git log 为准，未推送；证据和下一步见 [agent.md](agent.md)。

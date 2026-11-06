@@ -24,11 +24,21 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：Fork 草稿 PR 已创建，真实 CI 通过；main 门禁待授权，P5 排查暂停
+## 当前状态：main 必需 CI 已绑定，最新 CI 通过；负例演练与 P5 仍待办
 
-P6 基础已提交/推送为 `1211620882e860bb64cc621ed3d7e62a984ad552`。用户随后授权“执行下一步”，本轮只在个人 Fork 创建 Draft PR 并验证真实 CI，不合并、不发布/部署，不修改分支保护、Secrets 或工作流设置。P5 手机兼容排查没有恢复。用户随后明确授权“提交推送”，本次仅提交/推送三份交接文档至当前功能分支，结果以 Git log 和远程引用为准；新 head 的 CI 需另行核实，不能套用 12116208 的结果。
+本轮交接提交前功能分支 HEAD 为 `8e633e620701f225e71ea5810a88b6ddb6310122`。此前用户授权进行下一步，已在自己的 Fork `kanon-H/homepage` 配置 main 必需检查并读回核验；未合并 PR、未发布/部署、未改 Secrets 或工作流设置，没有恢复 P5 手机排查。用户随后授权“提交代码”，本次仅将三份交接本地提交，结果以 Git log 为准，未推送；已验证的远程 CI 仍对应 8e633e62，后续推送新 head 需重新核实。
 
-### P6 第二小步：Fork PR 与真实 CI（2026-11-06 已验证）
+### P6 第三小步：绑定 main 必需检查（已配置/正例核验，负例未演练）
+
+- 最新 [Fork CI run 42209452117](https://github.com/kanon-H/homepage/actions/runs/42209452117) 对 head `8e633e62…` 第一次运行 success，全部步骤成功；实际 job 日志再次确认 584 文件/2258 测试、生产构建成功，测试 PR 合并快照为 `7101527c19b355a31795e3882e2f6c427474b4cd`，不是沿用 12116208 的旧结果。
+- check_run `127864197191`：`Fork verification`，来源 `github-actions` App `15368`，head_sha 精确匹配 8e633e62。main 现要求此检查及来源，strict=true，需与最新 main 保持同步；完整保护和独立 required_status_checks GET 均已确认。
+- 首次局部 PATCH 返回 404“Required status checks not enabled”。先 GET 比对确认保护完全未变，再使用原配置完整保留的 PUT 首次启用；之后逐字段比较，除 required_status_checks 外全部不变。不将失败请求盲目重试或覆盖其他规则。
+- 必须 PR、零强制审批、管理员受约束、禁止强推/删除、不要求线性历史和允许 merge commit 等保持原状。main 仍 `2e5f1013`；[PR #1](https://github.com/kanon-H/homepage/pull/1) 仍 open/draft、merged=false、auto_merge=null。
+- 脱敏前后配置、写入策略和新 job 日志在 Git/Docker 忽略的 `config/p6-remote/evidence/main-gate/`。下载日志首次 TLS 握手超时，只重试 GET 后成功，不关闭 TLS 校验、不转发凭据给签名下载地址；无重复设置写入。
+- 已验证：真实绿色 CI 与检查来源、正例关联、保护配置生效和其他规则不变。**未验证：失败/缺失检查的实际阻断负例**；没有调用合并 API，也没有新建测试分支/PR。不能把配置读回或 Draft 状态当成负例通过。
+- 下一步可在另行授权后做隔离负例，创建临时测试分支/PR、读取 blocked 状态并清理，绝不合入 main。P5 完整验收、同步、镜像/回滚仍待办，三份交接现按用户随后授权仅本地提交，结果以 Git log 为准，未推送。
+
+### P6 第二小步：Fork PR 与真实 CI（历史首次验证；当前以上方为准）
 
 - [PR #1](https://github.com/kanon-H/homepage/pull/1)：`kanon-H/homepage:feature/multi-address → kanon-H/homepage:main`，不是向官方提交。保持 open/draft、merged=false、auto_merge=null；正文明确 AI 辅助及 P5 未完成项，不冒充完整 v1 验收。
 - [Fork CI run 42205861009](https://github.com/kanon-H/homepage/actions/runs/42205861009) 第一次运行完成 success；工具版本/SHA 核对、frozen install、Lint、584 文件/2258 测试、隔离生产构建及清理步骤全部 success。测试数量与生产编译成功也由实际 job 日志核实，不是沿用本地报告推断。
@@ -57,7 +67,7 @@ P6 基础已提交/推送为 `1211620882e860bb64cc621ed3d7e62a984ad552`。用户
 - 官方 GitHub 当前默认仍是 dev；我们明确选择稳定 main 作来源，本地 upstream/HEAD 指向 upstream/main，不将官方默认分支误当成需要跟踪的开发分支。
 - Fork `kanon-H/homepage` 的 GitHub 默认分支从 dev 改为 main；REST API 与 `git ls-remote --symref origin HEAD` 均确认 main。本地 origin/HEAD 已刷新为 origin/main。
 - main 基础保护已由 API 重新读取确认：必须 PR、required approvals=0（个人可自行合并）、enforce_admins=true、禁止强推/删除、不要求线性历史；allow_merge_commit 仍 true，squash/rebase 仓库开关保留原值。未执行任何 PR 合并。
-- **必需 CI 检查尚未绑定**（required_status_checks=null），这是用户确认的阶段安排：P6 先建立并验证 CI，再绑定实际检查名，不伪造检查或把基础保护当作完整 CI 门禁。
+- **P0 当时未绑定必需 CI**（required_status_checks=null），按用户确认留给 P6。本轮 P6 已按最新授权绑定真实检查及 App，当前配置以上方第三小步为准，负例仍未演练；不把 P0 基础保护当作当时已完成 CI 门禁。
 - P0 配置时 main/origin/main/upstream/main 保持 `2e5f1013`，二开位于 feature 分支 `d5ade7b6`；后续 P0 文档提交不等于把二开合入 main。
 - 复用现有仓库 Git 凭据，仅在内存使用 API 认证，无新凭据或安装工具。初次 GitHub PATCH 返回 500；先用 API/传输确认仍是 dev/未保护，再原样重试成功，未盲目覆盖现有规则。脱敏审计在 Git/Docker 忽略的 `config/p0-external/evidence/`，不提交凭据或原始配置。
 - 上轮手工测试实例已按原期限自动停止（status=expired，监听已消失）；未重启/续期，手机兼容排查继续暂停。
@@ -225,7 +235,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-Fork Draft PR #1 已创建，12116208 的真实 CI 通过。下一最小任务是另行授权将 `Fork verification`（github-actions App 15368）绑定到本 Fork main 必需检查并验证门禁；本轮没有这项设置写入授权，不直接合并或发布。合并前仍需明确处理 P5 未完成门禁；之后再开发/验证上游同步、可信发布和回滚。本轮三份交接更新已获随后明确提交/推送授权，结果以 Git log/远程为准；提交新 head 后需等待对应 CI。P5 手机排查仍暂停，下列 P5 路线仅在用户选择恢复时使用：
+main 已要求 `Fork verification`（github-actions App 15368），strict=true；8e633e62 的真实 CI 和配置读回已通过。下一最小验证项是用户另行授权的隔离负例（临时分支/PR、失败或缺失检查的 blocked 状态、结束清理），不调用 main 合并 API。合并前仍需明确处理 P5 未完成门禁；同步、可信发布和回滚仍待开发验证。本轮三份交接现按随后授权仅本地提交，结果以 Git log 为准，未推送；后续推送新 head 后仍需核实对应 CI。P5 手机排查继续暂停，下列 P5 路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
@@ -233,7 +243,7 @@ Fork Draft PR #1 已创建，12116208 的真实 CI 通过。下一最小任务�
 
 内部约定：default 的 `label: null` 用 i18n；候选为 `{ id, label, href, current }`，fallback 说明取解析结果。菜单状态只在当前 NetworkProvider 内，不读写偏好；新菜单使用记录身份隔离旧关闭任务/复制结果。getServiceSearchEntry 始终接收原始服务。
 
-P0 基础外部设置已按本轮授权完成；GitHub 默认 main 和本地 origin/HEAD→origin/main 均已验证，初始 dev 快照仅是历史。CI 必需检查绑定在 P6 完成前仍是待办，不能因 main 已有基础保护就假定 CI 已生效。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
+P0 基础外部设置已按本轮授权完成；GitHub 默认 main 和本地 origin/HEAD→origin/main 均已验证，初始 dev 快照仅是历史。CI 必需检查现已实际绑定，已核对配置与绿色正例；失败/缺失检查的负例仍待办，不能把配置正确扩大为已完成所有门禁演练。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
 
 ## 容易踩坑的关键点
 

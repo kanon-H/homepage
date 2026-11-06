@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查/合并门禁、上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
+> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查已配置读回，负例门禁、上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
 
 ## 1. 阅读顺序
 
@@ -66,7 +66,7 @@ main 当前基础保护：
 - 必须通过 PR；required approvals=0，个人可合并自己的 PR，不强制找第二人审批。
 - enforce_admins=true，管理员也受约束；allow_force_pushes=false、allow_deletions=false。
 - required_linear_history=false，allow_merge_commit=true，允许保留合并历史。仓库 squash/rebase 开关保留原值；**上游集成 PR 必须使用 merge commit、不 squash**，不是看到开关允许就随意选择。
-- **CI 尚待 P6**：required_status_checks=null，是用户确认的阶段安排，不绑定不存在或未经验证的检查名。最终要求仍是建立可信 CI 后作为必需检查，并实际验证合并门禁；不能把基础保护叫作完整 CI 保护。
+- **CI 已在 P6 后续绑定**：P0 当时按用户安排为 required_status_checks=null；本轮确认最新 PR 真实 CI 成功后，按新授权绑定 `Fork verification`、github-actions App 15368、strict=true。完整保护和独立状态检查接口均读回正确，其余规则不变；负例仍未演练，不把配置核验当成所有门禁场景已证明，详见 10.2。
 
 初次 PATCH 返回 HTTP 500 后，先重新用 API/传输确认仍 dev/未保护再重试；成功响应均 200，之后再读取验证策略。GitHub TLS 偶发握手中断均保留证据、使用原请求重试，没有关闭证书校验。现有认证凭据只在内存用于已授权的 Fork API，不打印/落盘；脱敏审计位于被 Git/Docker 忽略的 `config/p0-external/evidence/`。
 
@@ -86,7 +86,7 @@ P0 元数据配置时没有移动任何分支提交：main/origin/main/upstream/
 
 锁文件格式是 9.0，不代表必须用 pnpm 9。二开专用 CI 建议验证后统一到一个固定的 pnpm 10 补丁版本和 Node 24；版本在选型验证前不能写成“已经固定”。不要无故升级上游全部依赖或重写锁文件。
 
-初始核查时只有 Node 和 corepack，没有 pnpm 和 node_modules。2026-11-05 的 P0 已验证 Node `v24.22.1` / Corepack `0.36.0` / pnpm `10.34.9`，后续开发使用 `corepack pnpm@10.34.9 <命令>`。P6 新增的 fork-ci.yml 已固定 Node `24.22.1` / pnpm `10.34.9`；继承工作流只加官方仓库门禁，工具选择未改，package.json / 锁文件未改。固定版本的文件已本地验证，远程运行仍未验证，不能声称全部上游 CI 或 Docker 构建已统一。
+初始核查时只有 Node 和 corepack，没有 pnpm 和 node_modules。2026-11-05 的 P0 已验证 Node `v24.22.1` / Corepack `0.36.0` / pnpm `10.34.9`，后续开发使用 `corepack pnpm@10.34.9 <命令>`。P6 新增的 fork-ci.yml 已固定 Node `24.22.1` / pnpm `10.34.9`；继承工作流只加官方仓库门禁，工具选择未改，package.json / 锁文件未改。固定版本的 PR CI 已在 GitHub 真实运行验证，不能据此声称全部上游 CI 或 Docker 构建已统一。
 
 首次建立环境时，可先以 Corepack 试运行：
 
@@ -123,7 +123,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题仍未完成；P6 CI 基础已提交推送且 PR 真实运行通过，必需 CI 绑定及同步/发布仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
+P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题仍未完成；P6 CI 基础已提交推送且 PR 真实运行通过，必需 CI 已绑定并正例核验，负例门禁及同步/发布仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
 
 ### P0：建立可信开发基线
 
@@ -345,7 +345,8 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 
 - [x] 本地实现自有 PR 测试工作流，精确 Node/pnpm、frozen lockfile、Lint/完整测试/隔离生产构建；只读权限，29 项策略/脚本测试通过，详见 10.2。
 - [x] 功能分支已推送 12116208；本 Fork Draft PR #1 和真实 Fork CI run 42205861009 已创建/运行，全部步骤 success，见 10.2。
-- [ ] 将远程确认的 `Fork verification` / github-actions App 15368 绑定到 main 必需检查并验证门禁，仍待另行授权。required_status_checks=null 未改变，CI 通过不等于分支门禁已配置。
+- [x] 核对最新 head 8e633e62 的真实 CI 后，已按新授权绑定 `Fork verification` / github-actions App 15368、strict=true；完整/独立接口读回正确，其余保护逐项不变。
+- [ ] 失败/缺失检查的隔离负例仍待另行授权演练；未创建临时分支/PR，未调用合并 API，不把配置读回或 Draft 状态当成负例通过。
 - [ ] 上游 main 定期集成 PR，保留历史、冲突停止并通知。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。
@@ -502,7 +503,7 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 
 调度任务依赖 GitHub 默认分支及 Actions 设置，公开 Fork 还可能有启用/闲置限制。GitHub 设置是外部待办，不能在本地写了 YAML 就宣称完成。
 
-## 10. 自有 CI 与镜像发布（PR CI 已通过，门禁待授权、发布待开发）
+## 10. 自有 CI 与镜像发布（必需检查已绑定，负例待验、发布待开发）
 
 ### 10.1 已发现的上游适配点
 
@@ -521,7 +522,7 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 | `fork-upstream-sync.yml`（计划） | schedule / 手动                | 上游 merge 和更新 PR，不直接部署                   |
 | `fork-release.yml`（计划）       | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                  |
 
-`fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。已从真实 check_run 读取检查名 `Fork verification`、github-actions App ID 15368；本轮未写入 main 保护，不能把存在绿色检查当作已绑定必需检查。
+`fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。已从真实 check_run 读取检查名 `Fork verification`、github-actions App ID 15368；本轮核对最新 head 后已绑定 main 必需检查且 strict=true，并读回确认。绿色 CI 和配置核验均有实际证据，但失败/缺失检查的负例仍待演练。
 
 `scripts/fork-ci-build.sh` 构建启用多地址扩展的虚构配置，临时目录成功/失败均清理，原生密码认证变量随机生成且只在进程环境；不访问用户 config，不开服务或浏览器。Next.js 会另外自动加载环境文件，因此检测到 .env / .env.local / .env.production / .env.production.local（含符号链接）时直接拒绝，不删除用户文件；本地应在无这些文件的干净 checkout 运行。脚本需要 Bash、Node、pnpm，CI 使用固定版本工具；本机用忽略目录里的 pnpm wrapper 调用既有 Corepack，不安装全局工具。
 
@@ -542,7 +543,11 @@ PATH="$PWD/config/p6-baseline/bin:$PATH" RUNNER_TEMP="$PWD/config/p6-baseline" \
 
 2026-11-06 远程实证：用户授权执行下一步后，在 `kanon-H/homepage` 创建 [Draft PR #1](https://github.com/kanon-H/homepage/pull/1)，head=`1211620882e860bb64cc621ed3d7e62a984ad552`、base=本 Fork main；不是向官方提交。[Fork CI run 42205861009](https://github.com/kanon-H/homepage/actions/runs/42205861009) 第 1 次完成 success；全部步骤成功，job 日志明确为 584 文件/2258 项测试及生产编译成功。日志确认实际 checkout 的 PR 合并快照为 `01198d99b6bb75b81c2fbd3c6ff194aa59a28344`，不是实际合入 main。check_run 127852191491 的 name=`Fork verification`、app=`github-actions` / 15368，head_sha 正确关联 12116208。脱敏 API 快照/日志位于 Git/Docker 忽略的 `config/p6-remote/evidence/`，凭据只在内存，不转发给跨域日志下载地址。期间 GET 网络短暂失败后只读复查恢复，无重复建 PR、workflow 重跑或设置变更。
 
-远程限制：PR 保持 open/draft、merged=false、auto_merge=null；main 仍为 2e5f1013、required_status_checks=null，基础保护未改，门禁绑定须另行授权。本轮没有发布/部署、修改 Secrets 或启停工作流。旧 Lint/Tests/Docs 的 PR job 按官方条件 skipped；base/main 的 anti-slop、Auto Label PR 实际运行 success，未关闭 PR，但不能据此保证后续不干预。上游 job 门禁尚未合入 main。P5 排查仍暂停，不能将 CI 通过当完整人工验收。三份交接现已获用户随后明确提交/推送授权，仅推当前功能分支，结果以 Git log/远程为准；新 head 必须重新核实对应 CI，不套用本次 12116208 的绿色结果。
+后续最新验证与绑定：三份首次 CI 交接已推送为 `8e633e620701f225e71ea5810a88b6ddb6310122`；[Fork CI run 42209452117](https://github.com/kanon-H/homepage/actions/runs/42209452117) 第 1 次 success，check_run 127864197191 的 name/app/head_sha 均匹配，所有 job 步骤成功。实际日志确认测试合并快照 `7101527c19b355a31795e3882e2f6c427474b4cd`、584 文件/2258 测试及生产构建成功，不是复用旧 12116208 绿色结果。
+
+用户本轮授权“进行下一步工作”后，先确认最新 CI 成功，再为 main 配置 `required_status_checks={strict:true,checks:[{context:"Fork verification",app_id:15368}]}`。首次局部 PATCH 返回 404“Required status checks not enabled”，GET 完整比对确认无变更后，按已读取的原值完整保留 PUT 首次启用。之后 GET 完整保护和独立 required_status_checks 接口确认生效，除该字段外所有保护完全相同，仓库合并选项也未变。前后配置、请求策略和最新 CI 日志在忽略的 `config/p6-remote/evidence/main-gate/`。日志 GET 曾 TLS 握手超时，只读重试后成功，无 TLS 降级或重复设置写入。
+
+远程限制：main 仍为 2e5f1013；PR #1 仍 open/draft、merged=false、auto_merge=null。当前已证明配置生效与绿色正例，**未做失败/缺失检查的实际阻断负例**；没有新建测试分支/PR或调用合并 API，不能靠 Draft 状态代证。后续隔离负例需单独授权临时分支/PR及清理，不合入 main。本轮没有发布/部署、修改 Secrets 或启停工作流。首次 PR 的旧 Lint/Tests/Docs job 按官方条件 skipped，base/main 的 anti-slop、Auto Label PR success 且未关闭 PR，但不能保证以后都不干预；这些工作流条件尚未合入 main。P5 排查仍暂停，不将 CI 通过当完整人工验收。三份交接现按用户随后授权仅本地提交，结果以 Git log 为准，未推送；后续推送新 head 后仍需核实相应 CI。
 
 静态检查边界（保留首次本地证据）：shell PATH 未发现 Docker/Podman/actionlint/zizmor；但主动诊断实际调用了托管 zizmor，不能据 PATH 推断全部工具不可用。新工作流、Shell 脚本和 JS 测试分别 confirmed clean；10 份 YAML 中 3 份 confirmed clean、7 份保留原触发器/checkout 的既有诊断：Crowdin/Lint/Tests 的 3 项 artipacked，PR Quality/PR Triage/Reaction Comments/Release Drafter 的 4 项 dangerous-triggers。本轮仅加官方仓库门禁，不改其上游行为；这些诊断记录为 defer（不是 false-positive，不写 suppress），不称继承工作流全 clean。3 份 Markdown 无语言服务答复，记 inconclusive。未下载工具、未取得独立 actionlint 命令证据；未做镜像构建、GHCR 拉取或回滚。静态/托管诊断不代替 GitHub runner 实跑。
 
