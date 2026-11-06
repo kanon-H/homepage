@@ -25,6 +25,12 @@ jobs:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
+      - name: Gate negative probe - expected exit 42
+        shell: bash
+        run: |
+          echo "P6_GATE_NEGATIVE_EXPECTED_FAILURE"
+          exit 42
+
       - name: Validate source commit
         shell: bash
         run: |
