@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查已配置读回，负例门禁、上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
+> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查及失败负例已核验，上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
 
 ## 1. 阅读顺序
 
@@ -66,7 +66,7 @@ main 当前基础保护：
 - 必须通过 PR；required approvals=0，个人可合并自己的 PR，不强制找第二人审批。
 - enforce_admins=true，管理员也受约束；allow_force_pushes=false、allow_deletions=false。
 - required_linear_history=false，allow_merge_commit=true，允许保留合并历史。仓库 squash/rebase 开关保留原值；**上游集成 PR 必须使用 merge commit、不 squash**，不是看到开关允许就随意选择。
-- **CI 已在 P6 后续绑定**：P0 当时按用户安排为 required_status_checks=null；本轮确认最新 PR 真实 CI 成功后，按新授权绑定 `Fork verification`、github-actions App 15368、strict=true。完整保护和独立状态检查接口均读回正确，其余规则不变；负例仍未演练，不把配置核验当成所有门禁场景已证明，详见 10.2。
+- **CI 已在 P6 后续绑定**：P0 当时按用户安排为 required_status_checks=null；本轮确认最新 PR 真实 CI 成功后，按新授权绑定 `Fork verification`、github-actions App 15368、strict=true。完整保护和独立状态检查接口均读回正确，其余规则不变；失败负例后续已获授权验证并清理，检查缺失等场景未独立演练，不扩大结论，详见 10.2。
 
 初次 PATCH 返回 HTTP 500 后，先重新用 API/传输确认仍 dev/未保护再重试；成功响应均 200，之后再读取验证策略。GitHub TLS 偶发握手中断均保留证据、使用原请求重试，没有关闭证书校验。现有认证凭据只在内存用于已授权的 Fork API，不打印/落盘；脱敏审计位于被 Git/Docker 忽略的 `config/p0-external/evidence/`。
 
@@ -123,7 +123,7 @@ corepack pnpm@10 install --frozen-lockfile
 
 ## 5. 分阶段实施计划
 
-P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题仍未完成；P6 CI 基础已提交推送且 PR 真实运行通过，必需 CI 已绑定并正例核验，负例门禁及同步/发布仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
+P0 本地基线与基础外部设置、P1～P4 功能、P5 自动化与文档已完成；P5 剩余验收/兼容问题仍未完成；P6 CI 基础已提交推送且 PR 真实运行通过，必需 CI 配置、绿色正例及失败负例已核验，同步/发布仍未完成。阶段记录是当时的历史证据，后续浏览器与工具状态以 P5 记录为准。
 
 ### P0：建立可信开发基线
 
@@ -346,7 +346,8 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 - [x] 本地实现自有 PR 测试工作流，精确 Node/pnpm、frozen lockfile、Lint/完整测试/隔离生产构建；只读权限，29 项策略/脚本测试通过，详见 10.2。
 - [x] 功能分支已推送 12116208；本 Fork Draft PR #1 和真实 Fork CI run 42205861009 已创建/运行，全部步骤 success，见 10.2。
 - [x] 核对最新 head 8e633e62 的真实 CI 后，已按新授权绑定 `Fork verification` / github-actions App 15368、strict=true；完整/独立接口读回正确，其余保护逐项不变。
-- [ ] 失败/缺失检查的隔离负例仍待另行授权演练；未创建临时分支/PR，未调用合并 API，不把配置读回或 Draft 状态当成负例通过。
+- [x] 用户已授权隔离失败负例：临时 PR #2 非 Draft、Git 无冲突，同 App/名称的必需 CI 真实 failure 后 GitHub 报告 blocked；已关闭 PR/删除临时分支，未合并或调用合并 API。
+- [ ] 检查完全缺失、分支过期等其他门禁场景未独立演练；不把本次失败检查的结果扩大为全部场景，补充测试需另行确定范围。
 - [ ] 上游 main 定期集成 PR，保留历史、冲突停止并通知。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。
@@ -503,7 +504,7 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 
 调度任务依赖 GitHub 默认分支及 Actions 设置，公开 Fork 还可能有启用/闲置限制。GitHub 设置是外部待办，不能在本地写了 YAML 就宣称完成。
 
-## 10. 自有 CI 与镜像发布（必需检查已绑定，负例待验、发布待开发）
+## 10. 自有 CI 与镜像发布（失败门禁负例已验证，发布待开发）
 
 ### 10.1 已发现的上游适配点
 
@@ -522,7 +523,7 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 | `fork-upstream-sync.yml`（计划） | schedule / 手动                | 上游 merge 和更新 PR，不直接部署                   |
 | `fork-release.yml`（计划）       | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                  |
 
-`fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。已从真实 check_run 读取检查名 `Fork verification`、github-actions App ID 15368；本轮核对最新 head 后已绑定 main 必需检查且 strict=true，并读回确认。绿色 CI 和配置核验均有实际证据，但失败/缺失检查的负例仍待演练。
+`fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。已从真实 check_run 读取检查名 `Fork verification`、github-actions App ID 15368；本轮核对最新 head 后已绑定 main 必需检查且 strict=true，并读回确认。绿色 CI、配置核验和失败检查的非 Draft PR blocked 状态均有实际证据；检查完全缺失等场景未独立演练。
 
 `scripts/fork-ci-build.sh` 构建启用多地址扩展的虚构配置，临时目录成功/失败均清理，原生密码认证变量随机生成且只在进程环境；不访问用户 config，不开服务或浏览器。Next.js 会另外自动加载环境文件，因此检测到 .env / .env.local / .env.production / .env.production.local（含符号链接）时直接拒绝，不删除用户文件；本地应在无这些文件的干净 checkout 运行。脚本需要 Bash、Node、pnpm，CI 使用固定版本工具；本机用忽略目录里的 pnpm wrapper 调用既有 Corepack，不安装全局工具。
 
@@ -547,7 +548,11 @@ PATH="$PWD/config/p6-baseline/bin:$PATH" RUNNER_TEMP="$PWD/config/p6-baseline" \
 
 用户本轮授权“进行下一步工作”后，先确认最新 CI 成功，再为 main 配置 `required_status_checks={strict:true,checks:[{context:"Fork verification",app_id:15368}]}`。首次局部 PATCH 返回 404“Required status checks not enabled”，GET 完整比对确认无变更后，按已读取的原值完整保留 PUT 首次启用。之后 GET 完整保护和独立 required_status_checks 接口确认生效，除该字段外所有保护完全相同，仓库合并选项也未变。前后配置、请求策略和最新 CI 日志在忽略的 `config/p6-remote/evidence/main-gate/`。日志 GET 曾 TLS 握手超时，只读重试后成功，无 TLS 降级或重复设置写入。
 
-远程限制：main 仍为 2e5f1013；PR #1 仍 open/draft、merged=false、auto_merge=null。当前已证明配置生效与绿色正例，**未做失败/缺失检查的实际阻断负例**；没有新建测试分支/PR或调用合并 API，不能靠 Draft 状态代证。后续隔离负例需单独授权临时分支/PR及清理，不合入 main。本轮没有发布/部署、修改 Secrets 或启停工作流。首次 PR 的旧 Lint/Tests/Docs job 按官方条件 skipped，base/main 的 anti-slop、Auto Label PR success 且未关闭 PR，但不能保证以后都不干预；这些工作流条件尚未合入 main。P5 排查仍暂停，不将 CI 通过当完整人工验收。三份交接现按用户随后授权仅本地提交，结果以 Git log 为准，未推送；后续推送新 head 后仍需核实相应 CI。
+后续隔离负例：用户在结构化确认中明确选择临时分支/PR、故意失败 CI、核实 blocked 后清理，并要求不推送现有本地提交。以已验证远程 8e633e62 为正例，只给 workflow 添加一个 checkout 前 exit 42 步骤，YAML 解析/结构比较确认其余内容等价；相对 8e633e62 只有一个文件、一个提交差异。临时 [PR #2](https://github.com/kanon-H/homepage/pull/2) head 为 `1ed37174f0eaf39004b657665ed552df06a98c70`，非 Draft、Git mergeable=true、未合并/无 auto-merge；[run 42214850900](https://github.com/kanon-H/homepage/actions/runs/42214850900) 及 check_run 127882191736 真实 failure，name=`Fork verification`、App=15368、head 匹配，GitHub mergeable_state 明确为 **blocked**。失败仅为预期步骤，注解 exit code 42；原 checkout/安装/Lint/测试/构建步骤均 skipped，不声称本次运行通过了应用测试。此结果不靠 Draft 状态，也没有调用合并 API 试探。
+
+负例结束后 PR #2 已关闭未合并、临时分支已删除且 GET 确认不存在；完整保护和主分支/功能分支/主 PR 前后完全一致。状态、比较、job 步骤、退出码、blocked 和清理证据在忽略的 `config/p6-remote/evidence/gate-negative/`。**检查完全缺失、分支过期及其他绕过场景未独立测试**，不从单一失败案例推断全部场景。
+
+负例结束时的远程快照：main 为 2e5f1013、远程 feature 为 8e633e62；主 PR #1 为 open/draft、merged=false、auto_merge=null。本轮没有修改保护/Secrets、合并主 PR、发布/部署或恢复 P5。首次 PR 的旧 Lint/Tests/Docs job 按官方条件 skipped，base/main 的 anti-slop、Auto Label PR success；这些工作流条件仍未合入 main，后续行为不扩大保证。P5 完整验收、同步及发布/回滚仍未完成。负例验证期间本地 2b18802f 未推送；用户随后另行授权提交代码到远程 Git，本轮仅提交三份交接并连同已有 2b18802f 推送当前功能分支，结果以 Git log/远程为准，新 head CI 需重新核实。
 
 静态检查边界（保留首次本地证据）：shell PATH 未发现 Docker/Podman/actionlint/zizmor；但主动诊断实际调用了托管 zizmor，不能据 PATH 推断全部工具不可用。新工作流、Shell 脚本和 JS 测试分别 confirmed clean；10 份 YAML 中 3 份 confirmed clean、7 份保留原触发器/checkout 的既有诊断：Crowdin/Lint/Tests 的 3 项 artipacked，PR Quality/PR Triage/Reaction Comments/Release Drafter 的 4 项 dangerous-triggers。本轮仅加官方仓库门禁，不改其上游行为；这些诊断记录为 defer（不是 false-positive，不写 suppress），不称继承工作流全 clean。3 份 Markdown 无语言服务答复，记 inconclusive。未下载工具、未取得独立 actionlint 命令证据；未做镜像构建、GHCR 拉取或回滚。静态/托管诊断不代替 GitHub runner 实跑。
 

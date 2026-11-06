@@ -24,11 +24,20 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：main 必需 CI 已绑定，最新 CI 通过；负例演练与 P5 仍待办
+## 当前状态：main 必需 CI、绿色正例和失败负例已验证；P5/同步发布仍待办
 
-本轮交接提交前功能分支 HEAD 为 `8e633e620701f225e71ea5810a88b6ddb6310122`。此前用户授权进行下一步，已在自己的 Fork `kanon-H/homepage` 配置 main 必需检查并读回核验；未合并 PR、未发布/部署、未改 Secrets 或工作流设置，没有恢复 P5 手机排查。用户随后授权“提交代码”，本次仅将三份交接本地提交，结果以 Git log 为准，未推送；已验证的远程 CI 仍对应 8e633e62，后续推送新 head 需重新核实。
+负例验证时本地 HEAD 为 `2b18802f6986375c3e1bf6899067411ce11d8e09`，远程为 `8e633e62`。用户当时明确选择隔离验证及清理、不推送本地提交；随后另行授权“提交代码到远程git”。本轮仅提交三份交接并连同已有 2b18802f 推送当前功能分支，结果以 Git log 和远程引用为准；不合并 main、不修改保护/Secrets、不发布或恢复 P5。新 head 的 CI 需重新核实，不沿用旧绿色结果。
 
-### P6 第三小步：绑定 main 必需检查（已配置/正例核验，负例未演练）
+### P6 第四小步：失败 CI 隔离负例（已验证并清理）
+
+- 临时 [PR #2](https://github.com/kanon-H/homepage/pull/2) 基于已知绿色的远程 8e633e62；相对该正例只改 `.github/workflows/fork-ci.yml`，在 checkout 前加固定 exit 42 步骤。Node/YAML 结构比较确认触发器、权限、原步骤等均未变；应用、依赖/锁文件及用户配置不改。
+- 临时 head=`1ed37174f0eaf39004b657665ed552df06a98c70`；[run 42214850900](https://github.com/kanon-H/homepage/actions/runs/42214850900) 实际 failure，check_run 127882191736 为 `Fork verification` / App 15368，源码匹配。唯一失败步骤是预期注入点，注解明确 exit code 42，原安装/Lint/测试/构建步骤全部 skipped；这不是应用回归或一次新的完整测试通过。
+- 验证时 PR 非 Draft、Git mergeable=true（无冲突）、auto_merge=null、未合并，GitHub 的 mergeable_state 明确为 **blocked**。main 的唯一必需检查/来源和其他保护前后完全一致；不是用 Draft 阻止合并来冒充 CI 负例。
+- 验证后已关闭 PR #2（未合并）、删除临时分支，并用 GET 确认引用不存在。main 仍 2e5f1013、远程 feature 仍 8e633e62、本地仍 2b18802f，主 PR #1 保持 Draft；没有调用任何合并 API。
+- 状态/验证/退出码/清理证据在 Git/Docker 忽略的 `config/p6-remote/evidence/gate-negative/`；凭据仅在内存。不独立测试“检查完全缺失”、过期分支及其他绕过场景，不声称实际调用合并 API 遭拒。
+- CI 基础正例、必需检查绑定和本次失败检查的 blocked 状态已取得证据；P5 完整验收、上游同步、镜像发布/回滚仍待办，不自动合并主 PR 或进入发布。
+
+### P6 第三小步：绑定 main 必需检查（历史配置记录；当前以上方为准）
 
 - 最新 [Fork CI run 42209452117](https://github.com/kanon-H/homepage/actions/runs/42209452117) 对 head `8e633e62…` 第一次运行 success，全部步骤成功；实际 job 日志再次确认 584 文件/2258 测试、生产构建成功，测试 PR 合并快照为 `7101527c19b355a31795e3882e2f6c427474b4cd`，不是沿用 12116208 的旧结果。
 - check_run `127864197191`：`Fork verification`，来源 `github-actions` App `15368`，head_sha 精确匹配 8e633e62。main 现要求此检查及来源，strict=true，需与最新 main 保持同步；完整保护和独立 required_status_checks GET 均已确认。
@@ -235,7 +244,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-main 已要求 `Fork verification`（github-actions App 15368），strict=true；8e633e62 的真实 CI 和配置读回已通过。下一最小验证项是用户另行授权的隔离负例（临时分支/PR、失败或缺失检查的 blocked 状态、结束清理），不调用 main 合并 API。合并前仍需明确处理 P5 未完成门禁；同步、可信发布和回滚仍待开发验证。本轮三份交接现按随后授权仅本地提交，结果以 Git log 为准，未推送；后续推送新 head 后仍需核实对应 CI。P5 手机排查继续暂停，下列 P5 路线仅在用户选择恢复时使用：
+main 的必需检查、8e633e62 绿色正例和隔离失败负例均已核验，临时 PR/分支已清理。下一开发项可按用户指令进入 P6 上游同步/可信发布工作流的本地实现；外部实跑、默认分支入口、发布/回滚及主 PR 合并仍分别授权。合并前仍需明确处理 P5 未完成门禁。三份交接及已有 2b18802f 现按用户随后明确授权提交/推送当前功能分支，实际结果以 Git log/远程为准，新 head CI 仍需核实；“检查完全缺失”未独立测试。P5 手机排查继续暂停，下列 P5 路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
@@ -243,7 +252,7 @@ main 已要求 `Fork verification`（github-actions App 15368），strict=true�
 
 内部约定：default 的 `label: null` 用 i18n；候选为 `{ id, label, href, current }`，fallback 说明取解析结果。菜单状态只在当前 NetworkProvider 内，不读写偏好；新菜单使用记录身份隔离旧关闭任务/复制结果。getServiceSearchEntry 始终接收原始服务。
 
-P0 基础外部设置已按本轮授权完成；GitHub 默认 main 和本地 origin/HEAD→origin/main 均已验证，初始 dev 快照仅是历史。CI 必需检查现已实际绑定，已核对配置与绿色正例；失败/缺失检查的负例仍待办，不能把配置正确扩大为已完成所有门禁演练。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
+P0 基础外部设置已按本轮授权完成；GitHub 默认 main 和本地 origin/HEAD→origin/main 均已验证，初始 dev 快照仅是历史。CI 必需检查已绑定，配置/绿色正例及真实失败检查的 blocked 状态已验证；检查完全缺失等其他场景未独立演练，不扩大结论。不要一口气改全部页面和 CI；每阶段有证据后再更新状态。
 
 ## 容易踩坑的关键点
 
