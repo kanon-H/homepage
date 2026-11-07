@@ -1,4 +1,4 @@
-name: 'Reaction Comments'
+name: "Reaction Comments"
 
 on:
   issue_comment:
@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   action:
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-latest
     steps:
       - uses: dessant/reaction-comments@170a79b6e2538a1df7ba669ac527d7457cd3b128 # v5.0.1
