@@ -348,7 +348,8 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 - [x] 核对最新 head 8e633e62 的真实 CI 后，已按新授权绑定 `Fork verification` / github-actions App 15368、strict=true；完整/独立接口读回正确，其余保护逐项不变。
 - [x] 用户已授权隔离失败负例：临时 PR #2 非 Draft、Git 无冲突，同 App/名称的必需 CI 真实 failure 后 GitHub 报告 blocked；已关闭 PR/删除临时分支，未合并或调用合并 API。
 - [ ] 检查完全缺失、分支过期等其他门禁场景未独立演练；不把本次失败检查的结果扩大为全部场景，补充测试需另行确定范围。
-- [ ] 上游 main 定期集成 PR，保留历史、冲突停止并通知。
+- [x] 本地实现只读上游 main 预检（35 项新测试及真实只读访问），不写 refs/index/worktree/FETCH_HEAD、不创建提交或 PR，见 9.1；尚未远程运行新工作流。
+- [ ] 完整上游 main 定期集成 PR，保留历史、冲突通知、幂等处理及准确 CI 分派；只读预检不算本项完成。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。
 - [ ] 实际演练上游合并和镜像回滚，不直接部署生产。
@@ -484,9 +485,36 @@ git merge --no-ff upstream/main
 
 更新后检查 `DESIGN.md` 的快照、代码地图和本手册命令，只有必要的事实更新才修改文档，不把历史基线悄悄伪装成最新事实。
 
-## 9. 自动上游同步设计（计划）
+## 9. 上游同步（只读预检已本地实现，完整同步待开发）
 
-建议新增 `.github/workflows/fork-upstream-sync.yml`，而不是大改上游全部工作流。
+### 9.1 当前只读预检与验证
+
+新增 `.github/workflows/fork-upstream-sync.yml`，当前阶段**仅预检**：每周一 UTC 04:17 或手动触发，只匹配本 Fork main，checkout 事件的精确 SHA/完整历史，固定 Node 24.22.1。只有 contents: read，不传自定义 Secrets、不保留 Git 凭据，不具备 PR/Issue/镜像写权限。此文件现按用户随后授权随代码提交/推送功能分支，结果以 Git log/远程为准；仍未合入 main，不能据本地 YAML 宣称预检的调度/手动入口已远程验证。
+
+独立 stdlib 脚本 `scripts/fork-upstream-preflight.mjs`：
+
+- CLI 只接受可信 main 的 schedule/workflow_dispatch 上下文，核对 workspace、HEAD/事件 SHA、Fork origin；不接受 PR/ref 输入或任意远程地址。
+- 明确查询官方 HTTPS `refs/heads/main`，不采用官方默认 dev；只抓观察到 SHA 的 Git 对象，`--no-tags --no-write-fetch-head --no-recurse-submodules --refmap= --no-auto-maintenance`，没有目标 refspec，不移动 refs，也不启动自动维护。
+- `git merge-tree --write-tree` 只计算对象，不 checkout、写 index/worktree、建分支或提交。可能新增本地 Git 对象，因此“只读”指不改 refs/工作区且无远程写入，不是整个 .git 字节不变。clean-merge 只代表 Git 层面无冲突，不证明认证/字段/行为语义兼容，仍需后续 CI 与人工复核。
+- up-to-date/clean-merge 正常结束；conflict/unrelated-histories 非零结束。冲突只报告路径、不提供可发布候选树；其他错误用固定错误码，不回显 Git stderr 或环境。GitHub job summary 可见结果，自动 Issue/通知写入尚未实现。
+- `candidate_tree_sha` **是树对象，不是提交**，不能拿去创建 refs 或当成 CI source SHA。完整阶段仍须构造保留 main/upstream 父祖先的真实 merge commit，并核对 PR head/CI 关联。
+- Git 子进程使用隔离环境、禁用全局/系统配置、凭据助手、hooks、fsmonitor 和 HTTP 重定向；拒绝本地自定义驱动/过滤器/include/HTTP/凭据/URL 重写等配置。不安装依赖或执行上游脚本，不读取用户 YAML。
+
+复现聚焦测试：
+
+```bash
+corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows/fork-upstream-preflight.test.js
+```
+
+本地 Git 2.47.3 验证：35 项新测试（含真实 Git 合成分叉、冲突、无共同历史、dirty 文件、对象 fetch、hooks/驱动/URL 重写及入口/退出码），加既有 CI 策略共 2 文件/64 项通过。frozen install、Lint、完整 585 文件/2293 测试和隔离生产构建通过，保留两条已有 vi.unmock 警告；修改前 584 文件/2258 测试基线通过。3 个新 YAML/JS 文件主动诊断 confirmed clean，3 份 Markdown 为 inconclusive；新文件 Prettier、node --check 和 git diff --check 通过。依赖/锁文件和业务代码未改。
+
+本轮实际只读访问官方 main：观察到 2e5f10134ae3961bb936d3e7c441f9a1f4a4bf4f，与 Fork main 相同，结果 up-to-date；HEAD/全部 refs/index/worktree/FETCH_HEAD 前后核对不变。合并与冲突另有真实 Git fixture 证据，不冒充实际发现了上游更新或生成了集成 PR。报告/日志在忽略的 `config/p6-sync/evidence/`。本轮没有新工具下载或预检的远程实跑。代码现按用户随后授权仅提交/推送当前功能分支，结果以 Git log/远程为准，新 head 的 PR CI 需重新核实；不改设置、不合并主 PR、不发布/部署或恢复 P5。
+
+外部前置仍未满足：本轮只读 API 核查 `can_approve_pull_request_reviews=false`，Actions 尚不允许创建 PR；Git main 也尚无 fork-ci.yml 默认分支入口。未来写入阶段需要用户决定是否授权调整 Actions 设置（或另配受限 App），先解决可信 CI 的默认分支入口，不能静默开启、使用现有个人凭据塞入工作流或认为 GITHUB_TOKEN 建 PR 会自动触发 CI。
+
+### 9.2 完整同步阶段计划（未实现）
+
+以下保留完整目标，不把 9.1 预检误记成自动集成 PR 已完成。
 
 触发：低频 schedule（例如每周）和 `workflow_dispatch`。职责：
 
@@ -517,11 +545,11 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 
 ### 10.2 工作流拆分与 CI 基础实证
 
-| 文件与状态                       | 触发                           | 职责                                               |
-| -------------------------------- | ------------------------------ | -------------------------------------------------- |
-| `fork-ci.yml`（PR 验证通过）     | main 的 PR / main push / 手动  | frozen install、Lint、Vitest、生产构建；无发布权限 |
-| `fork-upstream-sync.yml`（计划） | schedule / 手动                | 上游 merge 和更新 PR，不直接部署                   |
-| `fork-release.yml`（计划）       | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                  |
+| 文件与状态                                   | 触发                           | 职责                                               |
+| -------------------------------------------- | ------------------------------ | -------------------------------------------------- |
+| `fork-ci.yml`（PR 验证通过）                 | main 的 PR / main push / 手动  | frozen install、Lint、Vitest、生产构建；无发布权限 |
+| `fork-upstream-sync.yml`（只读预检本地实现） | schedule / 手动                | 只计算更新/合并树/冲突；PR 写入与 CI 分派未实现    |
+| `fork-release.yml`（计划）                   | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                  |
 
 `fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。已从真实 check_run 读取检查名 `Fork verification`、github-actions App ID 15368；本轮核对最新 head 后已绑定 main 必需检查且 strict=true，并读回确认。绿色 CI、配置核验和失败检查的非 Draft PR blocked 状态均有实际证据；检查完全缺失等场景未独立演练。
 
@@ -553,6 +581,8 @@ PATH="$PWD/config/p6-baseline/bin:$PATH" RUNNER_TEMP="$PWD/config/p6-baseline" \
 负例结束后 PR #2 已关闭未合并、临时分支已删除且 GET 确认不存在；完整保护和主分支/功能分支/主 PR 前后完全一致。状态、比较、job 步骤、退出码、blocked 和清理证据在忽略的 `config/p6-remote/evidence/gate-negative/`。**检查完全缺失、分支过期及其他绕过场景未独立测试**，不从单一失败案例推断全部场景。
 
 负例结束时的远程快照：main 为 2e5f1013、远程 feature 为 8e633e62；主 PR #1 为 open/draft、merged=false、auto_merge=null。本轮没有修改保护/Secrets、合并主 PR、发布/部署或恢复 P5。首次 PR 的旧 Lint/Tests/Docs job 按官方条件 skipped，base/main 的 anti-slop、Auto Label PR success；这些工作流条件仍未合入 main，后续行为不扩大保证。P5 完整验收、同步及发布/回滚仍未完成。负例验证期间本地 2b18802f 未推送；用户随后另行授权提交代码到远程 Git，本轮仅提交三份交接并连同已有 2b18802f 推送当前功能分支，结果以 Git log/远程为准，新 head CI 需重新核实。
+
+最新 c40d9eb6 的 [Fork CI run 42217278462](https://github.com/kanon-H/homepage/actions/runs/42217278462) 亦已只读核对 completed/success，check 127890320033 的 name/App/head 与全部步骤成功，不沿用旧 head。新增预检文件现获随后授权提交/推送功能分支，不能用 c40 的远程绿色结果代签新 head；本轮本地验证见 9.1。
 
 静态检查边界（保留首次本地证据）：shell PATH 未发现 Docker/Podman/actionlint/zizmor；但主动诊断实际调用了托管 zizmor，不能据 PATH 推断全部工具不可用。新工作流、Shell 脚本和 JS 测试分别 confirmed clean；10 份 YAML 中 3 份 confirmed clean、7 份保留原触发器/checkout 的既有诊断：Crowdin/Lint/Tests 的 3 项 artipacked，PR Quality/PR Triage/Reaction Comments/Release Drafter 的 4 项 dangerous-triggers。本轮仅加官方仓库门禁，不改其上游行为；这些诊断记录为 defer（不是 false-positive，不写 suppress），不称继承工作流全 clean。3 份 Markdown 无语言服务答复，记 inconclusive。未下载工具、未取得独立 actionlint 命令证据；未做镜像构建、GHCR 拉取或回滚。静态/托管诊断不代替 GitHub runner 实跑。
 

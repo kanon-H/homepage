@@ -24,11 +24,22 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：main 必需 CI、绿色正例和失败负例已验证；P5/同步发布仍待办
+## 当前状态：上游同步只读预检已本地实现；完整同步 PR/发布仍待开发
 
-负例验证时本地 HEAD 为 `2b18802f6986375c3e1bf6899067411ce11d8e09`，远程为 `8e633e62`。用户当时明确选择隔离验证及清理、不推送本地提交；随后另行授权“提交代码到远程git”。本轮仅提交三份交接并连同已有 2b18802f 推送当前功能分支，结果以 Git log 和远程引用为准；不合并 main、不修改保护/Secrets、不发布或恢复 P5。新 head 的 CI 需重新核实，不沿用旧绿色结果。
+本轮开发基线为 `feature/multi-address@c40d9eb6766eacff36c11598b784afa1beb38dbd`，起始工作区干净，该 head 的真实 CI 已核对成功。只读预检、测试和交接完成后，用户另行明确授权提交到远程仓库；本次仅提交/推送这六个交付文件到当前功能分支，结果以 Git log/远程引用为准，新 head 的 CI 需重新核实。不创建真实同步 PR、不改 GitHub 设置、不合并/发布/部署，也不恢复 P5 排查。
 
-### P6 第四小步：失败 CI 隔离负例（已验证并清理）
+### P6 第五小步：只读上游 main 预检（本地完成，完整同步未完成）
+
+- c40d9eb6 的 [Fork CI run 42217278462](https://github.com/kanon-H/homepage/actions/runs/42217278462) completed/success，check 127890320033 的名称、App 15368、head 和全部 job 步骤均核对成功，不沿用旧 head 的状态。主 PR #1 仍 Draft/未合并。
+- 新增 `.github/workflows/fork-upstream-sync.yml`，当前仅 weekly/manual 的只读预检：本 Fork main 条件、事件确切 SHA、完整历史、固定 Node 24.22.1、contents: read、无凭据持久化，无发布/PR/推送权限。文件现按随后授权随代码提交/推送功能分支，结果以 Git log/远程为准；仍未合入 main，未验证此预检的远程调度运行。
+- 新增 `scripts/fork-upstream-preflight.mjs`：固定官方 HTTPS main，只获取观察到的 SHA 的对象，不取 tags、不写 FETCH_HEAD/refs；通过 Git 2.38+ merge-tree 计算合并树，不 checkout、不建分支/提交、不执行上游脚本/hooks。冲突或无共同历史失败；树 SHA 不是可供 CI 测试的提交，冲突时不输出可发布候选树。
+- 子进程不继承 GitHub Token/Git 认证/全局配置，拒绝本地自定义合并驱动、过滤器、URL 重写等配置；只输出受控错误码，不回显 Git stderr 或环境。不会读取用户 YAML 或更改导航/认证/Widget。
+- 新增 35 项测试：受信事件/来源/SHA、防误调用、真实 Git 的分叉/冲突/无共同历史/dirty 文件保护、对象抓取不改 refs/index/FETCH_HEAD、hooks/驱动与 URL 重写拒绝；两份 workflow 测试共 64 项通过。
+- 实际只读访问官方 main，观察 SHA 为 2e5f1013，与 Fork main 相同，结果 up-to-date；HEAD/refs/index/worktree/FETCH_HEAD 前后比对完全不变。冲突等情形有真实 Git 合成 fixture 证据，不声称实际有上游更新或已生成同步 PR。
+- frozen install、Lint、585 文件/2293 测试、隔离生产构建通过，仍仅两条已有 vi.unmock 警告。依赖/锁文件及业务代码未改，无新工具下载。证据在忽略的 `config/p6-sync/evidence/`；新工作流/脚本/测试 3 文件主动诊断 confirmed clean，3 份 Markdown 无语言服务答复为 inconclusive，不计 clean。
+- 完整自动同步仍待：bot PR 幂等/冲突通知、保留祖先的真实 merge commit、明确 CI dispatch/head 关联及结果处理。只读预检不算其完成；Actions 创建 PR 开关本轮只读核查仍为 false，main 尚无专用 CI 入口，外部设置/默认分支集成另行授权。镜像发布/回滚未开发，P5 仍暂停。
+
+### P6 第四小步：失败 CI 隔离负例（历史验证记录）
 
 - 临时 [PR #2](https://github.com/kanon-H/homepage/pull/2) 基于已知绿色的远程 8e633e62；相对该正例只改 `.github/workflows/fork-ci.yml`，在 checkout 前加固定 exit 42 步骤。Node/YAML 结构比较确认触发器、权限、原步骤等均未变；应用、依赖/锁文件及用户配置不改。
 - 临时 head=`1ed37174f0eaf39004b657665ed552df06a98c70`；[run 42214850900](https://github.com/kanon-H/homepage/actions/runs/42214850900) 实际 failure，check_run 127882191736 为 `Fork verification` / App 15368，源码匹配。唯一失败步骤是预期注入点，注解明确 exit code 42，原安装/Lint/测试/构建步骤全部 skipped；这不是应用回归或一次新的完整测试通过。
@@ -244,7 +255,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-main 的必需检查、8e633e62 绿色正例和隔离失败负例均已核验，临时 PR/分支已清理。下一开发项可按用户指令进入 P6 上游同步/可信发布工作流的本地实现；外部实跑、默认分支入口、发布/回滚及主 PR 合并仍分别授权。合并前仍需明确处理 P5 未完成门禁。三份交接及已有 2b18802f 现按用户随后明确授权提交/推送当前功能分支，实际结果以 Git log/远程为准，新 head CI 仍需核实；“检查完全缺失”未独立测试。P5 手机排查继续暂停，下列 P5 路线仅在用户选择恢复时使用：
+只读上游预检已本地完成，下一开发项是完整同步 PR/CI 分派的写入流程，不是立即开启自动同步。当前 Actions 创建 PR 开关为 false、main 尚缺专用 CI 文件；外部设置、同步实跑、主 PR 合并与镜像发布均需另行授权。同步前必须保留 merge 祖先，并核实检查关联到真实 PR head，不能把 tree SHA 或 main 工作流另行 checkout 的 SHA 当成已经测试的 head。本轮六个交付文件现按用户随后明确授权提交/推送功能分支，结果以 Git log/远程为准，新 head CI 仍需核实；合并前仍需处理 P5 未完成门禁；检查完全缺失未独立测试。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
