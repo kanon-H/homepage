@@ -23,6 +23,7 @@ nav:
       - configs/bookmarks.md
       - configs/info-widgets.md
       - configs/services.md
+      - configs/network.md
       - configs/kubernetes.md
       - configs/docker.md
       - configs/proxmox.md

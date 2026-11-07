@@ -11,7 +11,7 @@ permissions: {}
 jobs:
   close-needs-discussion:
     name: Issues Need Discussion
-    if: github.event_name == 'issues' && github.event.label.name == 'needs-discussion'
+    if: github.repository == 'gethomepage/homepage' && github.event_name == 'issues' && github.event.label.name == 'needs-discussion'
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -47,7 +47,7 @@ jobs:
 
   comment-needs-information:
     name: Discussions Need Information
-    if: github.event_name == 'discussion' && github.event.label.name == 'needs-information'
+    if: github.repository == 'gethomepage/homepage' && github.event_name == 'discussion' && github.event.label.name == 'needs-information'
     runs-on: ubuntu-latest
     permissions:
       discussions: write

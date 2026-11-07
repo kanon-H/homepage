@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import ModeSwitcher from "components/network/mode-switcher";
 import { renderWithProviders } from "test-utils/render-with-providers";
+import { NetworkProvider } from "utils/contexts/network";
+import { SettingsContext } from "utils/contexts/settings";
+import { NETWORK_PREFERENCE_KEY } from "utils/network/storage";
 
 vi.mock("components/resolvedicon", () => ({
   default: function ResolvedIconMock() {
@@ -245,5 +251,159 @@ describe("components/services/item", () => {
     );
 
     expect(screen.queryByTestId("kubernetes-status")).not.toBeInTheDocument();
+  });
+});
+
+const networkSettings = {
+  extensions: {
+    network: {
+      modes: [
+        { id: "lan", label: "LAN" },
+        { id: "vpn", label: "VPN" },
+      ],
+    },
+  },
+};
+const networkService = Object.freeze({
+  id: "network-service",
+  name: "Network App",
+  icon: "mdi:test",
+  type: "service",
+  href: "https://default.example.invalid/Case",
+  extensions: Object.freeze({
+    network: Object.freeze({ addresses: Object.freeze({ lan: "http://lan.example.invalid:8080/Case?x=2#Part" }) }),
+  }),
+  widgets: Object.freeze([{ index: 1, url: "http://widget.example.invalid" }]),
+});
+
+describe("service item network navigation", () => {
+  beforeEach(() => localStorage.removeItem(NETWORK_PREFERENCE_KEY));
+  afterEach(() => vi.restoreAllMocks());
+
+  it("keeps title/icon hrefs in sync with the switcher and falls back without mutating the original", () => {
+    renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <ModeSwitcher />
+        <Item service={networkService} groupName="G" />
+      </NetworkProvider>,
+    );
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    for (const link of screen.getAllByRole("link")) expect(link).toHaveAttribute("href", networkService.href);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "lan" } });
+    for (const link of screen.getAllByRole("link"))
+      expect(link).toHaveAttribute("href", networkService.extensions.network.addresses.lan);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "vpn" } });
+    for (const link of screen.getAllByRole("link")) expect(link).toHaveAttribute("href", networkService.href);
+    expect(networkService.href).toBe("https://default.example.invalid/Case");
+    expect(networkService.widgets[0].url).toBe("http://widget.example.invalid");
+  });
+
+  it.each([
+    ["_self", "_parent", "_self"],
+    [undefined, "_parent", "_parent"],
+    [undefined, undefined, "_blank"],
+  ])("preserves target precedence %j / %j", (target, globalTarget, expected) => {
+    localStorage.setItem(NETWORK_PREFERENCE_KEY, '{"version":1,"mode":"lan"}');
+    renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <Item service={{ ...networkService, target }} groupName="G" />
+      </NetworkProvider>,
+      { settings: { target: globalTarget } },
+    );
+    for (const link of screen.getAllByRole("link")) {
+      expect(link).toHaveAttribute("href", networkService.extensions.network.addresses.lan);
+      expect(link).toHaveAttribute("target", expected);
+      expect(link).toHaveAttribute("rel", "noreferrer");
+    }
+  });
+
+  it("SSR suppresses both expandable anchors but leaves a legacy service and Widget intact", () => {
+    const read = vi.spyOn(Storage.prototype, "getItem");
+    const legacy = { id: "legacy-service", name: "Legacy", href: "/legacy", icon: "mdi:test", widgets: [] };
+    const html = renderToString(
+      <SettingsContext.Provider value={{ settings: {} }}>
+        <NetworkProvider initialSettings={networkSettings}>
+          <ul>
+            <Item service={networkService} groupName="G" />
+            <Item service={legacy} groupName="G" />
+          </ul>
+        </NetworkProvider>
+      </SettingsContext.Provider>,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    expect(container.querySelectorAll("#network-service a[href]")).toHaveLength(0);
+    expect(container.querySelectorAll('#legacy-service a[href="/legacy"]')).toHaveLength(2);
+    expect(container.querySelector("#network-service .service-name")).toHaveTextContent("Network App");
+    expect(container.querySelector('[data-testid="service-widget"]')).toBeTruthy();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("hydrates real card links directly to the saved mode without ever attaching the default href", async () => {
+    localStorage.setItem(NETWORK_PREFERENCE_KEY, '{"version":1,"mode":"lan"}');
+    const ui = (
+      <SettingsContext.Provider value={{ settings: {} }}>
+        <NetworkProvider initialSettings={networkSettings}>
+          <ul>
+            <Item service={networkService} groupName="G" />
+          </ul>
+        </NetworkProvider>
+      </SettingsContext.Provider>
+    );
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(ui);
+    document.body.append(container);
+    const attributes = vi.spyOn(Element.prototype, "setAttribute");
+    const recoverable = vi.fn();
+    let root;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, ui, { onRecoverableError: recoverable });
+      });
+      const links = container.querySelectorAll("a[href]");
+      expect(links).toHaveLength(2);
+      for (const link of links) expect(link).toHaveAttribute("href", networkService.extensions.network.addresses.lan);
+      expect(attributes.mock.calls.filter(([name, value]) => name === "href" && value === networkService.href)).toEqual(
+        [],
+      );
+      expect(recoverable).not.toHaveBeenCalled();
+    } finally {
+      if (root) await act(async () => root.unmount());
+      attributes.mockRestore();
+      container.remove();
+    }
+  });
+
+  it("restores saved LAN directly and preserves Widget nodes and open statistics across mode changes", () => {
+    localStorage.setItem(NETWORK_PREFERENCE_KEY, '{"version":1,"mode":"lan"}');
+    renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <ModeSwitcher />
+        <Item service={{ ...networkService, container: "fictional", server: "local" }} groupName="G" />
+      </NetworkProvider>,
+      { settings: { showStats: false } },
+    );
+    const widget = screen.getByTestId("service-widget");
+    for (const link of screen.getAllByRole("link"))
+      expect(link).toHaveAttribute("href", networkService.extensions.network.addresses.lan);
+    fireEvent.click(screen.getByRole("button", { name: "View container stats" }));
+    const stats = screen.getByTestId("docker-widget");
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "default" } });
+    expect(screen.getByTestId("service-widget")).toBe(widget);
+    expect(screen.getByTestId("docker-widget")).toBe(stats);
+    expect(fireEvent.contextMenu(widget)).toBe(true);
+  });
+
+  it("uses original hrefs and does not read preferences when explicitly disabled", () => {
+    const read = vi.spyOn(Storage.prototype, "getItem");
+    renderWithProviders(
+      <NetworkProvider initialSettings={{ extensions: { network: { enabled: false } } }}>
+        <ModeSwitcher />
+        <Item service={networkService} groupName="G" />
+      </NetworkProvider>,
+    );
+    expect(screen.queryByRole("combobox")).toBeNull();
+    for (const link of screen.getAllByRole("link")) expect(link).toHaveAttribute("href", networkService.href);
+    expect(read).not.toHaveBeenCalled();
   });
 });

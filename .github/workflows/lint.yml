@@ -12,6 +12,7 @@ permissions:
 jobs:
   lint:
     name: Linting Checks
+    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -35,7 +36,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 24
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install
