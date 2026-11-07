@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查/正例及失败负例已核验，只读预检及同步 PR/CI 写入逻辑已本地实现，但未启用/远程验证，发布仍待开发，不表示扩展整体已验收。
+> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查/正例及失败负例已核验，只读预检及同步 PR/CI 写入逻辑已本地实现，独立基础 Draft PR #3 已过 CI，但未合入 main 或实跑同步，发布仍待开发，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -352,13 +352,13 @@ gethomepage/homepage main
 
 已补充失败门禁负例：[临时 PR #2](https://github.com/kanon-H/homepage/pull/2) 非 Draft、Git 无冲突，`Fork verification` / App 15368 预期 exit 42 后真实 failure，GitHub 报告 blocked；验证后已关闭 PR 并删除临时分支，主 PR/分支/完整保护不变。未调用合并 API，也未独立测试检查完全缺失等场景。
 
-写入流程只使用内置 GITHUB_TOKEN，可信同步控制器和执行候选代码的只读 CI 分离，不直接替换成 PAT/App。发布前固定校验默认 main 的 fork-ci.yml 文本 SHA256、候选中定义未改及入口 active；显式 dispatch 到同步分支，机器人意图评论先持久化，未知响应/有意图无 run 不盲重发。核验 run/repo/分支/head、job 的固定 Fork check URL、check id/name/App/源码及全部关键步骤；失败/跳过/超时不算通过。仅在 main 工作流 checkout 另一 SHA 不会改变 check_run 归属，不能冒充 PR 门禁。本地隔离/模拟通过不证明实际 GitHub 权限、触发和关联；默认分支入口、Actions 设置、真实 PR/CI 演练和 opt-in 启用仍须另行授权，当前没有自动同步在运行。自有镜像工作流仍待实现。流程/恢复策略及验证证据见 [DEVELOPMENT.md](DEVELOPMENT.md)。
+写入流程只使用内置 GITHUB_TOKEN，可信同步控制器和执行候选代码的只读 CI 分离，不直接替换成 PAT/App。发布前固定校验默认 main 的 fork-ci.yml 文本 SHA256、候选中定义未改及入口 active；显式 dispatch 到同步分支，机器人意图评论先持久化，未知响应/有意图无 run 不盲重发。核验 run/repo/分支/head、job 的固定 Fork check URL、check id/name/App/源码及全部关键步骤；失败/跳过/超时不算通过。仅在 main 工作流 checkout 另一 SHA 不会改变 check_run 归属，不能冒充 PR 门禁。本地隔离/模拟通过不证明实际 GitHub 权限、触发和关联；两项必要 Actions/Issues 设置已按后续明确授权完成并回读，默认 token read 和 main 保护不变；独立基础 Draft PR #3 已过 CI，但默认分支入口合并、真实同步 PR/CI 演练和 opt-in 启用仍须另行授权，当前没有自动同步在运行。自有镜像工作流仍待实现。流程/恢复策略及验证证据见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
 未来若引入 SQLite，必须先给出 ADR：数据归属、单文件挂载、事务、备份一致性、迁移/回滚、多副本限制。引入数据库不是当前阶段任务，也不能将其用于替换已稳定的 YAML 配置。
 
 ## 11. 当前交付状态
 
-最新开发基线为 feature/multi-address@de867208，其远程 Fork CI run 42351647910/check 128340874058 的源码、App 和全部步骤已核对成功，PR #1 仍 Draft。本轮本地新增同步写入/精确 head CI 流程和隔离测试后，用户另行授权仅提交/推送八个交付文件到功能分支，结果以 Git log/远程为准，新 head CI 需重新核实；没有设置写入或真实同步 dispatch，主入口尚未合入 main，P5 仍暂停。新测试共 57 项（同步 56 + checkout origin 1），最终验证见 DEVELOPMENT 9.2；不改依赖/锁文件、业务、认证、Widget 或 SPEC 行为合同。下列较早阶段保留为历史记录。
+本次交接提交前，功能分支为 feature/multi-address@27139eba（真实 CI run 42367180998/check 128387587103 成功），PR #1 仍 Draft。用户随后明确授权在纯 main 基线上独立准备/提交/推送自动化基础并创建 [Draft PR #3](https://github.com/kanon-H/homepage/pull/3)：chore/fork-automation-bootstrap@c64db269，19 个自动化/说明文件，不带导航业务或 feature 祖先。本地 121 项工作流、576 文件/2023 项完整测试和构建通过，真实 CI run 42385579913/check 128442134396 的源码、App 15368 和全部步骤已核实成功。两项必要设置已按授权开启并回读，默认 token read、完整 main 保护/其他策略、main@2e5f1013 和原 PR #1 不变；定时变量不存在且未创建，没有同步 dispatch、合并、发布或部署。三份交接此前仅本地更新，用户随后单独授权将其提交/推送当前 feature 分支，新 head CI 需重新核实；不改业务、设置、main 或基础分支。基础工作树干净，证据及授权边界见 DEVELOPMENT 9.3。P5 仍暂停；下列较早阶段保留为历史记录。
 
 当前分支 `feature/multi-address`，P4/P5 已按用户要求分别提交推送为 `808af4fa` / `d5ade7b6`。2026-11-06 又按用户确认的“main＋基础保护”补齐 P0 基础外部设置；P5 完整验收与 P6 仍未完成：
 

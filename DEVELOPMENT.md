@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查及失败负例已核验，上游同步 PR/CI 写入逻辑已本地实现但未启用，真实同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
+> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查及失败负例已核验，上游同步基础已独立创建 Draft PR #3 并通过 CI，但尚未合入 main 或启用，真实同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
 
 ## 1. 阅读顺序
 
@@ -350,7 +350,8 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 - [ ] 检查完全缺失、分支过期等其他门禁场景未独立演练；不把本次失败检查的结果扩大为全部场景，补充测试需另行确定范围。
 - [x] 本地实现只读上游 main 预检（35 项新测试及真实只读访问），不写 refs/index/worktree/FETCH_HEAD、不创建提交或 PR，见 9.1；尚未远程运行新工作流。
 - [x] 本地实现保留祖先的同步提交、Draft PR/Issue 幂等和精确 head CI 分派/核验，默认关闭，见 9.2。
-- [ ] 经授权将可信入口集成默认 main、核查设置并实跑真实同步 PR/CI，再决定启用定时；本地模拟不算远程完成。
+- [x] 独立基础 Draft PR #3 已创建且真实 CI 通过；两项必要设置已按明确授权写入/回读，默认 token read 和 main 保护不变，见 9.3。
+- [ ] 单独授权基础 PR 合入默认 main、手动入口验证及真实同步 PR/CI，再决定启用定时；基础 CI 不算同步端到端完成。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。
 - [ ] 实际演练上游合并和镜像回滚，不直接部署生产。
@@ -511,7 +512,7 @@ corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows/fork-upstream-pref
 
 本轮实际只读访问官方 main：观察到 2e5f10134ae3961bb936d3e7c441f9a1f4a4bf4f，与 Fork main 相同，结果 up-to-date；HEAD/全部 refs/index/worktree/FETCH_HEAD 前后核对不变。合并与冲突另有真实 Git fixture 证据，不冒充实际发现了上游更新或生成了集成 PR。报告/日志在忽略的 `config/p6-sync/evidence/`。本轮没有新工具下载或预检的远程实跑。代码现按用户随后授权仅提交/推送当前功能分支，结果以 Git log/远程为准，新 head 的 PR CI 需重新核实；不改设置、不合并主 PR、不发布/部署或恢复 P5。
 
-外部前置仍未满足：本轮只读 API 核查 `can_approve_pull_request_reviews=false`，Actions 尚不允许创建 PR；Git main 也尚无 fork-ci.yml 默认分支入口。未来写入阶段需要用户决定是否授权调整 Actions 设置（或另配受限 App），先解决可信 CI 的默认分支入口，不能静默开启、使用现有个人凭据塞入工作流或认为 GITHUB_TOKEN 建 PR 会自动触发 CI。
+历史预检时外部前置未满足：当时只读核查 `can_approve_pull_request_reviews=false`，main 也无 fork-ci.yml 默认入口；当前两项设置已按新授权完成、基础 Draft PR 待合并，见 9.3。未来写入阶段需要用户决定是否授权调整 Actions 设置（或另配受限 App），先解决可信 CI 的默认分支入口，不能静默开启、使用现有个人凭据塞入工作流或认为 GITHUB_TOKEN 建 PR 会自动触发 CI。
 
 ### 9.2 同步 PR 与精确 head CI（本地实现，尚未启用）
 
@@ -544,7 +545,23 @@ corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows
 
 最终 frozen install、Lint、工作流 3 文件/121 项、完整 Vitest 586 文件/2350 项（111.03 秒）、隔离生产构建、两个脚本 node --check 和 git diff --check 通过；仍有两条既有 vi.unmock 警告。8 文件主动诊断：4 confirmed clean、4 inconclusive（3 Markdown 无答复、1 push-only/silent-on-clean），不能用空结果代签全 clean。基线首次 2 条、首次修改后 1 条既有 auth-boundary 测试发生 5000ms 导入超时；原命令无改动复跑均通过，未删除/放宽认证测试、超时或并发配置。保留失败与复跑日志，不把超时隐去。证据在 Git/Docker 忽略的 `config/p6-integrate/evidence/`；依赖/锁文件、业务和 SPEC 导航合同不变。
 
-**远程待授权/待证据：** 本轮提交/推送功能分支已获用户单独授权，新 head CI 必须另行核查；其余步骤未授权。可信 CI/预检/同步文件需经受控 PR 进入默认 main，不能为此擅自合并主 PR 或跳过 P5 决策。Actions 创建 PR 开关最后只读核查为 false，另需确认 Issue 功能与 job 权限、工作流 active 和 Fork 调度/闲置限制；本轮不自动更改。随后获授权手动执行，有真实上游更新时验证 PR/CI/通知；无更新的 no-op 不算完整正例。还需核实内置 token 对包含工作流文件变更的 Git 推送限制；不能由 contents: write 推断具备全部 workflow-file 写入能力。若被拒绝，当前逻辑失败并留诊断，不剔除上游变更或偷偷换 PAT/App；须人工集成或另行设计受限身份/事件方案。只有实跑核实后才另行决定启用定时变量。镜像发布、回滚和生产部署仍是后续独立阶段。
+**远程待授权/待证据：** 功能分支 27139eba 和独立基础 c64db269 的真实 CI 均已核实；两项外部设置已按后续授权完成，见 9.3。可信入口仍须经基础 PR 单独授权进入默认 main，不能擅自合并主 PR #1 或跳过 P5 决策；真实 job 权限/入口和 Fork 调度/闲置限制仍待实跑。随后获授权手动执行，有真实上游更新时验证 PR/CI/通知；无更新的 no-op 不算完整正例。还需核实内置 token 对包含工作流文件变更的 Git 推送限制；不能由 contents: write 推断具备全部 workflow-file 写入能力。若被拒绝，当前逻辑失败并留诊断，不剔除上游变更或偷偷换 PAT/App；须人工集成或另行设计受限身份/事件方案。只有实跑核实后才另行决定启用定时变量。镜像发布、回滚和生产部署仍是后续独立阶段。
+
+### 9.3 独立基础 PR 与外部设置实证（已完成本轮授权，尚未合并）
+
+用户明确选择独立基础 PR 并授权新分支提交/推送/创建 Draft PR，以及仅开启 Actions 创建/审批 PR 和仓库 Issues；不合并、不启用定时、不发布/部署或恢复 P5。为避免提前合入导航功能，在仓库内忽略的 config/p6-bootstrap/worktree 从 main@2e5f1013 建立 chore/fork-automation-bootstrap，提取 feature@27139eba 中 18 个已验证自动化文件，新增自包含 FORK_AUTOMATION.md。
+
+提交 c64db2699d7c9b26bbd359b7c08b8c5653587bbe 的唯一父为 main@2e5f1013，不含 feature 祖先。非 force 推送后创建 [Draft PR #3](https://github.com/kanon-H/homepage/pull/3)，仅 19 个自动化/说明文件，无导航、认证、Widget、依赖/锁文件或 Docker 改动；原 feature@27139eba 和主 PR #1 保持不变。
+
+- 基线：纯 main 的 frozen/offline install、Lint、573 文件/1902 测试、隔离构建通过。基线构建只在内存重定位可信构建脚本的 cd，保证构建纯 main，而非原功能树；前后工作树干净。
+- 补丁：frozen/offline install、Lint、3 文件/121 工作流测试、576 文件/2023 完整测试、隔离生产构建、JS/YAML Prettier、Node/Bash 语法、diff 检查通过，保留两条既有 vi.unmock 警告。原功能分支的 2350 项计数不能移用于此分支。
+- 10 个交付文件主动诊断 9 confirmed clean、1 Markdown inconclusive。Prettier 无 Shell parser 的初次工具报错保留在 static.log，Shell 以 bash -n 检查通过；不是删除源码、弱化断言或忽略真实错误。未安装新工具，未重跑浏览器/部署。
+- [Fork CI run 42385579913](https://github.com/kanon-H/homepage/actions/runs/42385579913) 第一次 completed/success；job/check 128442134396 的 name=Fork verification、App 15368、head=c64db269 与全部步骤核实。实际 PR 测试快照 83b939067b8229d50f8d33a09fa74356e6b20c9b 的树等于基础 head 的树，不能称已合入 main。只核对了元数据/步骤，不以本地计数冒充下载过的 runner 日志。
+- 设置仅两项：can_approve_pull_request_reviews=true、has_issues=true，默认 token 仍 read；完整 main 保护、其他仓库/合并策略、main 和原 PR #1 前后逐项相同。定时 opt-in 变量不存在且未创建，没有同步 dispatch 或其他生产操作。
+
+证据均在 Git/Docker 忽略的 config/p6-bootstrap/evidence/：remote-preconditions、baseline-build、extraction、verification、precommit、settings/、bootstrap-pr、bootstrap-ci-verification、completion 等。CI 观察首次 GET 网络失败仅只读重查；没有重复写设置、建 PR 或 rerun CI，凭据不落盘。独立工作树干净；原工作树三份交接此前仅本地更新，用户随后单独授权将 agent.md / DESIGN.md / DEVELOPMENT.md 提交/推送当前 feature 分支，实际结果以 Git log/远程为准，新 head CI 必须另行核查；不改业务、设置、main 或基础分支。
+
+下一步需单独授权基础 PR #3 标记 Ready 后以 merge commit 合入 main，不 squash/force；再分别确认手动预检、真实上游更新 PR/CI 和 workflow-file 权限边界。没有真实更新的 no-op 不算写入正例；定时 opt-in 仍未启用。基础 PR 合入后原功能分支需要另行 merge main 并重跑 CI，即使文件相同也不能沿用旧祖先/检查。P5/主 PR #1、镜像发布和回滚仍独立待办。
 
 ## 10. 自有 CI 与镜像发布（失败门禁负例已验证，发布待开发）
 

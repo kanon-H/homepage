@@ -24,11 +24,21 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：上游同步 PR/CI 写入逻辑已本地实现；尚未启用或远程验证
+## 当前状态：独立基础 Draft PR #3 已过 CI；main 合并与同步实跑仍待授权
 
-本轮基线为干净的 `feature/multi-address@de867208673416fea256a8ff166370a0e274dd8d`。开发阶段仅本地实现、隔离 Git 和模拟 API 测试；用户随后明确授权提交到远程仓库，本次仅提交/推送八个交付文件到当前功能分支，实际结果以 Git log/远程引用为准，新 head CI 需重新核实。不改设置、不创建真实同步 PR、不合并 main、不发布/部署或恢复 P5。
+本次交接提交前，功能分支/远程为 `feature/multi-address@27139ebaa3c51f8d446287a596420732415fbbd9`，主 PR #1 保持 open/draft、未合并、auto_merge=null。独立基础分支为 `chore/fork-automation-bootstrap@c64db2699d7c9b26bbd359b7c08b8c5653587bbe`，main 仍 2e5f1013。用户本轮明确授权新分支提交/推送/创建 Draft PR，以及仅开启 Actions 创建/审批 PR 与 Issues；不合并、不启用定时、不发布部署或恢复 P5。
 
-### P6 第六小步：上游同步写入流程（本地实现，远程待授权）
+### P6 第七小步：独立自动化基础 PR 与最小外部设置（已验证，尚未合并）
+
+- 新建 [Draft PR #3](https://github.com/kanon-H/homepage/pull/3)：chore/fork-automation-bootstrap → 本 Fork main。以纯 main 2e5f1013 为父，只提取 feature@27139eba 的 18 个自动化文件，加自包含 FORK_AUTOMATION.md，共 19 文件；不包含导航功能、认证、Widget、依赖/锁文件或 Docker 改动，不带功能分支祖先。
+- 原 main 基线 frozen/offline install、Lint、573 文件/1902 测试及隔离构建通过；独立基础补丁为 3 文件/121 工作流测试、576 文件/2023 完整测试和生产构建通过，仍为两条既有 vi.unmock 警告。不要套用功能分支 2350 项计数。新交付 10 文件主动诊断 9 confirmed clean、1 Markdown inconclusive；Shell 用 bash -n，Prettier 无 Shell parser 的工具错误保留，未改源码或测试掩盖。
+- c64db269 的 [真实 CI run 42385579913](https://github.com/kanon-H/homepage/actions/runs/42385579913) 第一次 completed/success；check 128442134396 的 name/App 15368/head 与全部步骤均核实。实际 PR 测试快照 83b939067b8229d50f8d33a09fa74356e6b20c9b，API 树 SHA 等于基础 head 的树，不是已合入 main。
+- 两项设置已写入并读回：can_approve_pull_request_reviews=true、has_issues=true；默认 token 仍 read。完整 main 保护、其他仓库/合并策略、main 和原 PR #1 前后不变。FORK_UPSTREAM_SYNC_ENABLED 变量不存在且未创建；没有同步 dispatch、定时启用或生产操作。
+- 新基础分支、远程引用和隔离工作树一致且干净，工作树位于 config/p6-bootstrap/worktree。原 feature 的 [run 42367180998](https://github.com/kanon-H/homepage/actions/runs/42367180998) 亦已核实成功；交接此前仅在原工作树本地更新；用户现另行明确授权将三份交接提交/推送当前 feature 分支，实际结果以 Git log/远程为准，新 head CI 需另行核实，不沿用旧绿色结果。不改业务、设置或基础分支。
+- 所有证据在 Git/Docker 忽略的 config/p6-bootstrap/evidence/：verification、settings/before/after/verification、bootstrap-pr、bootstrap-ci-verification、completion 等 JSON。CI 观察首次 GET 网络瞬断，仅只读重试，无重复设置/建 PR 或 CI rerun。凭据仅在内存，未进入 Git。
+- 下一步须单独授权审查并将基础 PR #3 标记 Ready、以 merge commit 合入 main；之后默认入口的手动预检/真实同步演练、workflow-file 写入边界与定时启用仍需分别确认。P5、主 PR #1 合并、镜像发布/回滚均未完成，不能把基础 PR 的绿色 CI 当成同步端到端完成。
+
+### P6 第六小步：上游同步写入流程（历史交付；当前以上方为准）
 
 - de867208 的 [Fork CI run 42351647910](https://github.com/kanon-H/homepage/actions/runs/42351647910) 已只读核实 completed/success；check 128340874058 的名称、App 15368、源码及全部步骤成功。主 PR #1 仍 open/draft、未合并、auto_merge=null，main 仍 2e5f1013；这不是本轮未提交代码的远程 CI。
 - 新增 `.github/workflows/fork-upstream-integrate.yml` 和 stdlib 脚本 `scripts/fork-upstream-integrate.mjs`。只在可信 main 执行；手动须选 create_pr=true，定时须仓库变量 FORK_UPSTREAM_SYNC_ENABLED=true（缺省关闭）。本轮不设置变量或启用调度。只读预检工作流仍不具备写权限。
@@ -266,7 +276,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-同步 PR/CI 流程已本地实现，本轮随后获授权仅提交/推送当前功能分支的八个交付文件，实际结果以 Git log/远程为准；新 head 的真实 CI 必须另行核对，不能套用 de867208 的绿色结果。main 尚缺专用 CI/同步默认入口，Actions 创建 PR 开关最后核查为 false；默认分支集成、外部设置、真实同步演练与启用定时变量分别确认，不因本轮写了 YAML 自动执行。上游无更新的 no-op 不能代替真实 PR/dispatch 正例。详见 DEVELOPMENT 第 9.2 节；P5 未完成门禁及主 PR 是否合并需单独决策，镜像发布/回滚仍待开发。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
+独立基础 Draft PR #3/c64db269 的真实 CI 已通过，两项必要设置已核验。下一步先取得单独的主分支合并授权，再将基础 PR 标记 Ready、以 merge commit 合入 main；不要合并含 P5 未完成导航功能的主 PR #1。默认入口进入 main 后，再分别授权手动预检、真实同步 PR/CI 演练和定时 opt-in；当前没有自动同步在运行，上游无更新的 no-op 不能代替真实正例。基础 PR 合并后，功能分支还需另行 merge main 并重跑 CI，不 rebase/force。详见 DEVELOPMENT 第 9.3 节；本轮随后已获用户单独授权，仅提交/推送原工作树三份交接；不代表合并 PR 或执行同步的授权，镜像发布/回滚仍待开发。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
