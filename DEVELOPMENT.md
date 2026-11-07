@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查及失败负例已核验，上游同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
+> 当前状态：P1～P4 功能及 P5 自动化/使用文档已完成；真实 Chromium 自动化与本地 HTTPS/nginx 缓存检查通过。人工原生浏览器、物理设备及目标认证/缓存环境验收未完成；P6 基础及本 Fork PR 的真实 CI 已通过，main 必需检查及失败负例已核验，上游同步 PR/CI 写入逻辑已本地实现但未启用，真实同步和发布/回滚尚待验证。已执行证据见第 5 节和 agent.md，未勾选项不是已完成。
 
 ## 1. 阅读顺序
 
@@ -349,7 +349,8 @@ P4 当时没有新增静态规则豁免，P3 的 QuickLaunch 单点说明保持�
 - [x] 用户已授权隔离失败负例：临时 PR #2 非 Draft、Git 无冲突，同 App/名称的必需 CI 真实 failure 后 GitHub 报告 blocked；已关闭 PR/删除临时分支，未合并或调用合并 API。
 - [ ] 检查完全缺失、分支过期等其他门禁场景未独立演练；不把本次失败检查的结果扩大为全部场景，补充测试需另行确定范围。
 - [x] 本地实现只读上游 main 预检（35 项新测试及真实只读访问），不写 refs/index/worktree/FETCH_HEAD、不创建提交或 PR，见 9.1；尚未远程运行新工作流。
-- [ ] 完整上游 main 定期集成 PR，保留历史、冲突通知、幂等处理及准确 CI 分派；只读预检不算本项完成。
+- [x] 本地实现保留祖先的同步提交、Draft PR/Issue 幂等和精确 head CI 分派/核验，默认关闭，见 9.2。
+- [ ] 经授权将可信入口集成默认 main、核查设置并实跑真实同步 PR/CI，再决定启用定时；本地模拟不算远程完成。
 - [ ] 自有标签镜像发布，amd64/arm64、SHA 和版本追溯。
 - [ ] 确认 GHCR 权限/可见性、可信触发、发布门禁。
 - [ ] 实际演练上游合并和镜像回滚，不直接部署生产。
@@ -485,7 +486,7 @@ git merge --no-ff upstream/main
 
 更新后检查 `DESIGN.md` 的快照、代码地图和本手册命令，只有必要的事实更新才修改文档，不把历史基线悄悄伪装成最新事实。
 
-## 9. 上游同步（只读预检已本地实现，完整同步待开发）
+## 9. 上游同步（本地实现，远程待授权验证）
 
 ### 9.1 当前只读预检与验证
 
@@ -496,7 +497,7 @@ git merge --no-ff upstream/main
 - CLI 只接受可信 main 的 schedule/workflow_dispatch 上下文，核对 workspace、HEAD/事件 SHA、Fork origin；不接受 PR/ref 输入或任意远程地址。
 - 明确查询官方 HTTPS `refs/heads/main`，不采用官方默认 dev；只抓观察到 SHA 的 Git 对象，`--no-tags --no-write-fetch-head --no-recurse-submodules --refmap= --no-auto-maintenance`，没有目标 refspec，不移动 refs，也不启动自动维护。
 - `git merge-tree --write-tree` 只计算对象，不 checkout、写 index/worktree、建分支或提交。可能新增本地 Git 对象，因此“只读”指不改 refs/工作区且无远程写入，不是整个 .git 字节不变。clean-merge 只代表 Git 层面无冲突，不证明认证/字段/行为语义兼容，仍需后续 CI 与人工复核。
-- up-to-date/clean-merge 正常结束；conflict/unrelated-histories 非零结束。冲突只报告路径、不提供可发布候选树；其他错误用固定错误码，不回显 Git stderr 或环境。GitHub job summary 可见结果，自动 Issue/通知写入尚未实现。
+- up-to-date/clean-merge 正常结束；conflict/unrelated-histories 非零结束。冲突只报告路径、不提供可发布候选树；其他错误用固定错误码，不回显 Git stderr 或环境。GitHub job summary 可见结果；此只读工作流不自动建 Issue，写入流程见 9.2。
 - `candidate_tree_sha` **是树对象，不是提交**，不能拿去创建 refs 或当成 CI source SHA。完整阶段仍须构造保留 main/upstream 父祖先的真实 merge commit，并核对 PR head/CI 关联。
 - Git 子进程使用隔离环境、禁用全局/系统配置、凭据助手、hooks、fsmonitor 和 HTTP 重定向；拒绝本地自定义驱动/过滤器/include/HTTP/凭据/URL 重写等配置。不安装依赖或执行上游脚本，不读取用户 YAML。
 
@@ -512,25 +513,38 @@ corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows/fork-upstream-pref
 
 外部前置仍未满足：本轮只读 API 核查 `can_approve_pull_request_reviews=false`，Actions 尚不允许创建 PR；Git main 也尚无 fork-ci.yml 默认分支入口。未来写入阶段需要用户决定是否授权调整 Actions 设置（或另配受限 App），先解决可信 CI 的默认分支入口，不能静默开启、使用现有个人凭据塞入工作流或认为 GITHUB_TOKEN 建 PR 会自动触发 CI。
 
-### 9.2 完整同步阶段计划（未实现）
+### 9.2 同步 PR 与精确 head CI（本地实现，尚未启用）
 
-以下保留完整目标，不把 9.1 预检误记成自动集成 PR 已完成。
+新增 `.github/workflows/fork-upstream-integrate.yml` 和 `scripts/fork-upstream-integrate.mjs`，只使用 Node stdlib。**开发阶段仅本地实现和隔离测试；用户随后明确授权将八个交付文件提交/推送当前功能分支，实际结果以 Git log/远程引用为准，新 head CI 需重新核实。未创建真实同步 PR、改设置或执行同步工作流 dispatch。** 只读预检依然单独存在，不提升其权限。
 
-触发：低频 schedule（例如每周）和 `workflow_dispatch`。职责：
+触发与权限：
 
-1. 显式以 Fork `main` 为起点，官方 `main` 为唯一上游源，完整获取所需历史。
-2. 检测是否已有相同上游 SHA 的更新 PR，幂等处理，使用 concurrency 避免并发推同一分支。
-3. 在独立临时分支尝试 merge，不能 force push Fork main。
-4. 无更新则结束；冲突则任务失败并通知/创建有明确诊断的 issue，不忽略错误继续发布。
-5. 合并成功创建或更新集成 PR，等待独立 CI 和人工审核。
-6. 不执行未经信任 PR 修改的脚本，不使用 `pull_request_target` 检出并执行外部代码获取 Secrets。
-7. 最小权限：同步任务仅在需要时拥有 contents/pull-requests write；镜像权限只给发布任务。
+- 本 Fork main 的手动触发须明确选择 `create_pr=true`（默认 false）；每周一 UTC 04:47 的定时写入须仓库变量 `FORK_UPSTREAM_SYNC_ENABLED=true`，缺省不运行。每仓库固定 concurrency、不取消前次任务；本轮没有设置该变量。
+- 默认 contents: read；仅 integration job 拥有 contents/pull-requests/issues/actions write，分别用于分支、Draft PR、诊断 Issue/意图评论和 CI dispatch。不授予 packages/id-token/admin，不执行审批、合并、删除或发布。
+- 仅支持内置 GITHUB_TOKEN，token 只传给可信 main 脚本；不沿用本机个人凭据、不新增自定义 Secrets。**不能直接换成 PAT/App**：普通事件触发及机器人身份边界会改变，须单独重审和测试。
 
-**事件触发陷阱：** 用默认 `GITHUB_TOKEN` 推送/创建 PR 通常不会像人工推送那样触发后续普通 push/PR 工作流。必须在设计时解决：例如显式调用可信的 reusable/workflow_dispatch 测试入口，或采用权限受限的 GitHub App token。不能看到 PR 已创建就认为必需 CI 会自动执行；使用 PAT/App 需要用户配置和授权，绝不写进仓库。
+实现与失败策略：
 
-P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到同步分支，核对 run 的 head_sha/分支、实际检查归属和结论，并处理异步失败通知。dispatch 入口需先进入默认分支，调用权限/设置仍待同步阶段实现验证。仅让 main 上的 reusable job checkout 任意 source_sha，不会自动把 check_run 关联到该 SHA，不能据此称 PR 必需检查已满足；当前未新增这种易混淆入口。
+1. 验证可信 workflow_ref/main/精确事件 SHA、workspace/HEAD/origin 和 API 的固定 public Fork 身份、默认分支及实时 main。上游固定官方 HTTPS main，先做原对象级预检，不切换工作区或执行合并树中的任何脚本。
+2. 无更新返回 up-to-date；冲突/无共同祖先停止，创建或复用固定上游 SHA 的机器人诊断 Issue（含源 SHA、受控错误码、截断冲突路径和 run 链接）。通知接口失败明确 unconfirmed，不冒充邮件送达或人工已读。
+3. clean-merge 构造真实 commit-tree 提交，父提交依次为 Fork main 和官方 main，不把 tree SHA 当 commit。仅非 force push 到固定 Fork 的 `sync/upstream-main-<完整上游SHA>`；Git 子进程 token 仅在临时、固定 URL 范围的 header 环境中，不落 config/参数/日志；HTTP 不跟随重定向。
+4. 分支/PR 采用保守不可变策略：同 SHA 的已知父提交/树可复用；人工修改、main 过期、未知树/父提交、移除标记或重复 PR 则失败并请人工处理，不自动刷新或覆盖代码。关闭未合并的 PR 视为拒绝，不重开；有其他上游 PR 待审时不再开第二个。Git 非 force push 保留竞争中的分叉历史，推送后再次核查 ref。
+5. 创建 Draft PR，保留人工正文/状态，不启用 auto-merge；分页最多扫描 1000 条，不确定是否重复则停止。API 写入未知响应不盲重试，下一可信运行按实际 ref/PR/评论恢复。
+6. 发布前校验 main 的 fork-ci.yml 文本 SHA256 等于脚本的 CI_DIGEST，候选中该文件完全不变，且 API 默认入口 active。**修改 CI 定义须在同一受审 PR 显式更新此 pin 及测试**，不能自动信任新权限/Secrets/工作流。
+7. 内置 token 推送/建 PR 不保证触发普通 CI，因此显式 workflow_dispatch 到同步分支。机器人评论先持久化该 head 的 dispatch 意图；遇到已有意图但无可见 run，或未知 dispatch 响应时，需人工检查，不自动重发。若确认无 run，操作者可手动将 fork-ci.yml dispatch 到该同步分支，再重跑同步核验；不要为消除红灯盲删标记、强推或重开 PR。
+8. 观察最多 25 分钟，核查 workflow/path/event/分支/repo/head、run 的 job、job 的固定 Fork check_run_url、check id/name/App 15368/head、所有结论及安装/Lint/测试/构建步骤。失败/跳过/缺失/排队超时不算成功，不自动 rerun 失败 CI。轮询和结束时重查 main/ref/PR；最终证据关联真实 PR head，不是 caller main 或 tree。
 
-调度任务依赖 GitHub 默认分支及 Actions 设置，公开 Fork 还可能有启用/闲置限制。GitHub 设置是外部待办，不能在本地写了 YAML 就宣称完成。
+复现本地测试（不需要 GitHub token，不产生远程写入）：
+
+```bash
+corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows
+```
+
+新增同步测试 56 项（模拟 API、真实隔离 Git 双父提交/祖先/工作区不变与 bare 非 force 推送），另补 1 项 checkout origin 回归：既有真实 CI 日志的 remote add origin 不带 .git；现仅接受固定 Fork 有/无后缀两种 HTTPS 地址，未放宽协议、主机或仓库。原预检的隔离参数/环境仅抽成共用导出，仍无远程写权限。
+
+最终 frozen install、Lint、工作流 3 文件/121 项、完整 Vitest 586 文件/2350 项（111.03 秒）、隔离生产构建、两个脚本 node --check 和 git diff --check 通过；仍有两条既有 vi.unmock 警告。8 文件主动诊断：4 confirmed clean、4 inconclusive（3 Markdown 无答复、1 push-only/silent-on-clean），不能用空结果代签全 clean。基线首次 2 条、首次修改后 1 条既有 auth-boundary 测试发生 5000ms 导入超时；原命令无改动复跑均通过，未删除/放宽认证测试、超时或并发配置。保留失败与复跑日志，不把超时隐去。证据在 Git/Docker 忽略的 `config/p6-integrate/evidence/`；依赖/锁文件、业务和 SPEC 导航合同不变。
+
+**远程待授权/待证据：** 本轮提交/推送功能分支已获用户单独授权，新 head CI 必须另行核查；其余步骤未授权。可信 CI/预检/同步文件需经受控 PR 进入默认 main，不能为此擅自合并主 PR 或跳过 P5 决策。Actions 创建 PR 开关最后只读核查为 false，另需确认 Issue 功能与 job 权限、工作流 active 和 Fork 调度/闲置限制；本轮不自动更改。随后获授权手动执行，有真实上游更新时验证 PR/CI/通知；无更新的 no-op 不算完整正例。还需核实内置 token 对包含工作流文件变更的 Git 推送限制；不能由 contents: write 推断具备全部 workflow-file 写入能力。若被拒绝，当前逻辑失败并留诊断，不剔除上游变更或偷偷换 PAT/App；须人工集成或另行设计受限身份/事件方案。只有实跑核实后才另行决定启用定时变量。镜像发布、回滚和生产部署仍是后续独立阶段。
 
 ## 10. 自有 CI 与镜像发布（失败门禁负例已验证，发布待开发）
 
@@ -548,7 +562,8 @@ P6 CI 基础阶段保留 workflow_dispatch，后续同步拟显式 dispatch 到�
 | 文件与状态                                   | 触发                           | 职责                                               |
 | -------------------------------------------- | ------------------------------ | -------------------------------------------------- |
 | `fork-ci.yml`（PR 验证通过）                 | main 的 PR / main push / 手动  | frozen install、Lint、Vitest、生产构建；无发布权限 |
-| `fork-upstream-sync.yml`（只读预检本地实现） | schedule / 手动                | 只计算更新/合并树/冲突；PR 写入与 CI 分派未实现    |
+| `fork-upstream-sync.yml`（只读预检本地实现） | schedule / 手动                | 只计算更新/合并树/冲突；始终无远程写入权限         |
+| `fork-upstream-integrate.yml`（本地实现）    | 显式确认手动 / opt-in 定时     | 双父提交、Draft PR/Issue、精确 head CI；远程未启用 |
 | `fork-release.yml`（计划）                   | 自有 `fork-v*` 标签 / 受控手动 | 再验证、构建 amd64/arm64、推 GHCR                  |
 
 `fork-ci.yml` 仅匹配 kanon-H/homepage，运行 Ubuntu 24.04 / Node 24.22.1 / pnpm 10.34.9；单 Job `Fork verification`，contents: read，无自定义 Secrets、Codecov、缓存、产物上传、镜像登录。checkout 使用 github.sha、禁用凭据持久化，安装后核对 HEAD 与工具版本。没有路径过滤/continue-on-error；并发取消仅限同类事件与同一 PR/ref。已从真实 check_run 读取检查名 `Fork verification`、github-actions App ID 15368；本轮核对最新 head 后已绑定 main 必需检查且 strict=true，并读回确认。绿色 CI、配置核验和失败检查的非 Draft PR blocked 状态均有实际证据；检查完全缺失等场景未独立演练。

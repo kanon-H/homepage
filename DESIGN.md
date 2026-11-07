@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查/正例及失败负例已核验，只读上游预检已本地实现，完整同步/发布仍待完成，不表示扩展整体已验收。
+> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查/正例及失败负例已核验，只读预检及同步 PR/CI 写入逻辑已本地实现，但未启用/远程验证，发布仍待开发，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -342,7 +342,7 @@ gethomepage/homepage main
 - 认证边界、Next.js/React 主版本变化。
 - 测试 harness、依赖锁文件和 Docker 构建流程。
 
-自动化的完整目标是发现、尝试合并、创建 PR、测试，不承诺自动解决语义冲突。当前仅本地新增只读预检阶段：fork-upstream-sync.yml + scripts/fork-upstream-preflight.mjs，固定官方 main、事件 main 快照、contents: read；只抓 Git 对象并用 merge-tree 计算更新/树/冲突，不修改 refs/index/工作区，不生成提交或 PR，不执行上游代码。合并树 SHA 不等于提交 SHA；将来真实写入阶段仍须构造保留祖先的 merge commit 并验证 CI 关联。不把预检报告当成已经集成上游或完整 CI 通过。人工批准生产发布。向上游贡献前阅读 `CONTRIBUTING.md`：当前上游对 AI 生成 PR 有明确限制，不能默认提交即可接受。
+自动化目标是发现、对象级尝试合并、创建 Draft PR、测试，不承诺自动解决语义冲突。fork-upstream-sync.yml + scripts/fork-upstream-preflight.mjs 始终只有只读预检权限；固定官方 main、事件 main 快照，只抓 Git 对象并计算树/冲突，不改 refs/index/工作区或发布提交。另新增默认关闭的 fork-upstream-integrate.yml + scripts/fork-upstream-integrate.mjs：仅可信 main 的明确手动确认或 opt-in 定时才具备最小写权限，以 commit-tree 生成真实双父提交，经固定 Fork 的非 force 分支提出 Draft PR；不 checkout/执行合并树代码，不审批、合并、删除或发布。分支/PR 仅复用已知父提交/树，人工修改/过期 main 停止待审；拒绝的 PR 不重开，有其他更新待审不重复开。冲突/失败以机器人 Issue 去重诊断，不保证通知送达。人工批准合并及生产发布。向上游贡献前阅读 `CONTRIBUTING.md`：当前上游对 AI 生成 PR 有明确限制，不能默认提交即可接受。
 
 ## 10. 发布与长期存储
 
@@ -352,11 +352,13 @@ gethomepage/homepage main
 
 已补充失败门禁负例：[临时 PR #2](https://github.com/kanon-H/homepage/pull/2) 非 Draft、Git 无冲突，`Fork verification` / App 15368 预期 exit 42 后真实 failure，GitHub 报告 blocked；验证后已关闭 PR 并删除临时分支，主 PR/分支/完整保护不变。未调用合并 API，也未独立测试检查完全缺失等场景。
 
-完整同步 PR 写入/CI 分派及自有镜像工作流仍待实现；新增只读预检没有这些权限，也尚未在远程运行。后续同步必须验证 CI 检查真实关联到 PR head；仅在 main 工作流中 checkout 另一 SHA，不会改变 check_run 的归属，不可冒充 PR 门禁。专用工作流、权限、回滚和构建陷阱见 [DEVELOPMENT.md](DEVELOPMENT.md)。
+写入流程只使用内置 GITHUB_TOKEN，可信同步控制器和执行候选代码的只读 CI 分离，不直接替换成 PAT/App。发布前固定校验默认 main 的 fork-ci.yml 文本 SHA256、候选中定义未改及入口 active；显式 dispatch 到同步分支，机器人意图评论先持久化，未知响应/有意图无 run 不盲重发。核验 run/repo/分支/head、job 的固定 Fork check URL、check id/name/App/源码及全部关键步骤；失败/跳过/超时不算通过。仅在 main 工作流 checkout 另一 SHA 不会改变 check_run 归属，不能冒充 PR 门禁。本地隔离/模拟通过不证明实际 GitHub 权限、触发和关联；默认分支入口、Actions 设置、真实 PR/CI 演练和 opt-in 启用仍须另行授权，当前没有自动同步在运行。自有镜像工作流仍待实现。流程/恢复策略及验证证据见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
 未来若引入 SQLite，必须先给出 ADR：数据归属、单文件挂载、事务、备份一致性、迁移/回滚、多副本限制。引入数据库不是当前阶段任务，也不能将其用于替换已稳定的 YAML 配置。
 
 ## 11. 当前交付状态
+
+最新开发基线为 feature/multi-address@de867208，其远程 Fork CI run 42351647910/check 128340874058 的源码、App 和全部步骤已核对成功，PR #1 仍 Draft。本轮本地新增同步写入/精确 head CI 流程和隔离测试后，用户另行授权仅提交/推送八个交付文件到功能分支，结果以 Git log/远程为准，新 head CI 需重新核实；没有设置写入或真实同步 dispatch，主入口尚未合入 main，P5 仍暂停。新测试共 57 项（同步 56 + checkout origin 1），最终验证见 DEVELOPMENT 9.2；不改依赖/锁文件、业务、认证、Widget 或 SPEC 行为合同。下列较早阶段保留为历史记录。
 
 当前分支 `feature/multi-address`，P4/P5 已按用户要求分别提交推送为 `808af4fa` / `d5ade7b6`。2026-11-06 又按用户确认的“main＋基础保护”补齐 P0 基础外部设置；P5 完整验收与 P6 仍未完成：
 
@@ -370,4 +372,4 @@ gethomepage/homepage main
 - P0 基础外部已完成：新增官方 upstream 仅跟踪 main，来源 `2e5f1013` 与基线相同；Fork 默认改 main，本地 origin/HEAD 同步；main 要求 PR、零强制审批、管理员受约束、禁止强推/删除，保留 merge commit。官方默认仍 dev，不影响明确使用其 main 来源。没有合并或移动分支代码，二开仍在功能分支。
 - P6 只读 CI 基础/隔离构建脚本/29 项策略测试已提交为 `12116208`，交接为 `8e633e62`。[最新 Fork CI](https://github.com/kanon-H/homepage/actions/runs/42209452117) 针对 8e633e62 成功，实际 job 日志确认 584 文件/2258 测试及生产构建通过，测试 PR 快照为 7101527c；check_run 127864197191 的名称/来源/源码均已核实。
 - main 已绑定 `Fork verification`、github-actions App 15368、strict=true，原保护其他字段未变，首次启用的 API 过程和读回证据保留。用户本轮另行确认后完成隔离失败负例：run 42214850900/check 127882191736 的失败来源/步骤/源码均核实，非 Draft 的无冲突 PR 报告 blocked，临时 PR/分支已清理，未调用合并 API。检查完全缺失等其他场景未独立测；不将一个负例当完整 v1 验收。负例结束时 main 为 2e5f1013、远程 feature 为 8e633e62、主 PR #1 为 Draft；三份交接及已有 2b18802f 现获用户随后明确提交/推送授权，仅推功能分支，结果以 Git log/远程为准，新 head CI 需重新核实。没有修改 Secrets、发布/部署或恢复 P5；完整同步/镜像及回滚仍待完成，证据和下一步见 [agent.md](agent.md)。
-- 后续交接已推送为 c40d9eb6，[真实 CI run 42217278462](https://github.com/kanon-H/homepage/actions/runs/42217278462) 已核实 success。本轮本地新增只读上游预检/工作流及 35 项测试，frozen install、Lint、585 文件/2293 测试、生产构建通过，实际读取官方 main 为 2e5f1013、无更新，refs/index/worktree/FETCH_HEAD 未变。完整同步写入仍缺实现，Actions 创建 PR 开关为 false、main 缺专用 CI 入口，未自动更改这些外部条件。六个交付文件现按用户随后明确授权提交/推送功能分支，实际结果以 Git log/远程为准，新 head CI 未代签；未创建同步 PR、合并或发布，依赖/锁文件与业务行为合同未改。
+- 历史预检交付：后续交接已推送为 c40d9eb6，[真实 CI run 42217278462](https://github.com/kanon-H/homepage/actions/runs/42217278462) 已核实 success。本轮本地新增只读上游预检/工作流及 35 项测试，frozen install、Lint、585 文件/2293 测试、生产构建通过，实际读取官方 main 为 2e5f1013、无更新，refs/index/worktree/FETCH_HEAD 未变。完整同步写入仍缺实现，Actions 创建 PR 开关为 false、main 缺专用 CI 入口，未自动更改这些外部条件。六个交付文件现按用户随后明确授权提交/推送功能分支，实际结果以 Git log/远程为准，新 head CI 未代签；未创建同步 PR、合并或发布，依赖/锁文件与业务行为合同未改。

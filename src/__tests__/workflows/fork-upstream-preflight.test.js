@@ -148,19 +148,22 @@ describe("trusted read-only upstream workflow", () => {
     expect(run.mock.calls.some(([, args]) => args[0] === "fetch")).toBe(false);
   });
 
-  it("runs the trusted snapshot through explicit upstream main only", () => {
-    const run = vi.fn((_cwd, args) => {
-      if (args[0] === "config") return { status: 1, output: "" };
-      if (args[0] === "remote") return { status: 0, output: "https://github.com/kanon-H/homepage.git" };
-      if (args[0] === "ls-remote") return { status: 0, output: sha + "\trefs/heads/main\n" };
-      if (args[0] === "cat-file") return { status: 0, output: "commit\n" };
-      return { status: 0, output: args[1] === "--show-toplevel" ? root : sha };
-    });
-    expect(runPreflight(context, run)).toMatchObject({ outcome: "up-to-date", main_sha: sha, upstream_sha: sha });
-    expect(
-      run.mock.calls.some(([, args]) => ["push", "checkout", "switch", "update-ref", "commit"].includes(args[0])),
-    ).toBe(false);
-  });
+  it.each(["https://github.com/kanon-H/homepage.git", "https://github.com/kanon-H/homepage"])(
+    "runs the trusted snapshot with canonical origin %s through explicit upstream main only",
+    (origin) => {
+      const run = vi.fn((_cwd, args) => {
+        if (args[0] === "config") return { status: 1, output: "" };
+        if (args[0] === "remote") return { status: 0, output: origin };
+        if (args[0] === "ls-remote") return { status: 0, output: sha + "\trefs/heads/main\n" };
+        if (args[0] === "cat-file") return { status: 0, output: "commit\n" };
+        return { status: 0, output: args[1] === "--show-toplevel" ? root : sha };
+      });
+      expect(runPreflight(context, run)).toMatchObject({ outcome: "up-to-date", main_sha: sha, upstream_sha: sha });
+      expect(
+        run.mock.calls.some(([, args]) => ["push", "checkout", "switch", "update-ref", "commit"].includes(args[0])),
+      ).toBe(false);
+    },
+  );
 
   it("does not accept dev, HEAD or extra ls-remote output", () => {
     expect(parseUpstreamRef(sha + "\trefs/heads/main\n")).toBe(sha);

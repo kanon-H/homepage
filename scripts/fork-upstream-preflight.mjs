@@ -19,8 +19,23 @@ function validSha(value) {
   return value;
 }
 
+export const GIT_OPTIONS = Object.freeze([
+  "-c",
+  "core.hooksPath=/dev/null",
+  "-c",
+  "core.fsmonitor=false",
+  "-c",
+  "core.attributesFile=/dev/null",
+  "-c",
+  "credential.helper=",
+  "-c",
+  "http.extraHeader=",
+  "-c",
+  "http.followRedirects=false",
+]);
+
 // Public upstream only: no inherited Git credentials, hooks, tracing or global drivers.
-export function gitCommand(cwd, args, accepted = [0]) {
+export function gitEnvironment() {
   const env = {};
   for (const key of [
     "PATH",
@@ -52,25 +67,17 @@ export function gitCommand(cwd, args, accepted = [0]) {
     GIT_TRACE_CURL: "0",
     GIT_CURL_VERBOSE: "0",
   });
-  const result = spawnSync(
-    "git",
-    [
-      "-c",
-      "core.hooksPath=/dev/null",
-      "-c",
-      "core.fsmonitor=false",
-      "-c",
-      "core.attributesFile=/dev/null",
-      "-c",
-      "credential.helper=",
-      "-c",
-      "http.extraHeader=",
-      "-c",
-      "http.followRedirects=false",
-      ...args,
-    ],
-    { cwd, env, encoding: "utf8", timeout: 120_000, maxBuffer: 8 * 1024 * 1024 },
-  );
+  return env;
+}
+
+export function gitCommand(cwd, args, accepted = [0]) {
+  const result = spawnSync("git", [...GIT_OPTIONS, ...args], {
+    cwd,
+    env: gitEnvironment(),
+    encoding: "utf8",
+    timeout: 120_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
   if (result.error || !accepted.includes(result.status)) {
     // Never echo subprocess stderr, arguments, environment or credentials.
     throw new PreflightError("git-operation-failed");
@@ -172,7 +179,9 @@ export function runPreflight(env, run = gitCommand) {
     run(cwd, ["rev-parse", "HEAD"]).output.trim() !== mainSha
   )
     throw new PreflightError("checkout-snapshot-mismatch");
-  if (run(cwd, ["remote", "get-url", "origin"]).output.trim() !== `https://github.com/${FORK}.git`) {
+  const origin = run(cwd, ["remote", "get-url", "origin"]).output.trim();
+  // actions/checkout uses the canonical HTTPS URL without a .git suffix.
+  if (![`https://github.com/${FORK}.git`, `https://github.com/${FORK}`].includes(origin)) {
     throw new PreflightError("fork-origin-required");
   }
   return analyzeMerge(cwd, mainSha, fetchUpstreamMain(cwd, run), run);
