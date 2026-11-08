@@ -580,6 +580,33 @@ corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows
 
 三份交接的提交/推送已获本轮单独授权；功能分支同步 main 仍须另行确认。当前官方无更新，不能篡改上游来源或制造更新来凑写入正例；后续写入演练、定时 opt-in、P5/主 PR #1、镜像发布与回滚分别处理。
 
+### 9.5 功能分支同步 main（本轮授权与本地实证）
+
+上轮三份交接提交/推送为 aba75941c9daddf57c6888d82630fe3faa3dc7da，其真实 CI run 42464356595/check 128680299573 第一次成功，App 15368、精确 head 和全部步骤已核实。用户随后结构化明确授权：将 main57acb02c merge 到 feature/multi-address，更新必要交接、保留双父提交，frozen 安装/Lint/完整测试/构建通过后非 force 推送并核查新 CI；不合并 PR #1、不运行写入同步或部署。
+
+只读预演树为 a2853c2d77dfd766502b5aad51a95865e1a9d9ba，无冲突、内容仅新增 FORK_AUTOMATION.md；HEAD/refs/index/worktree/FETCH_HEAD 前后不变，可能新增 Git 对象。实际本地先 --no-ff --no-commit 合并，核对暂存树完全一致，再创建纯 merge 提交 **d34ccc1b62b1dd2d98646309fc2d0683b7bfea16**，父顺序精确为 aba75941、57acb02c。该提交已包含当前 main，不再缺少其两个祖先；没有重写历史、切换/移动本地 main 或改变任何业务、认证、Widget、依赖/锁文件、Docker 和工作流定义。
+
+在真实 d34ccc1b 提交上执行并首次全部通过：
+
+```bash
+COREPACK_ENABLE_AUTO_PIN=0 corepack pnpm@10.34.9 install --frozen-lockfile --offline
+corepack pnpm@10.34.9 lint
+corepack pnpm@10.34.9 exec vitest run src/__tests__/workflows
+corepack pnpm@10.34.9 test
+PATH="$PWD/config/p6-baseline/bin:$PATH" RUNNER_TEMP="$PWD/config/p6-feature-sync" \
+  bash scripts/fork-ci-build.sh
+node --check scripts/fork-upstream-preflight.mjs
+node --check scripts/fork-upstream-integrate.mjs
+bash -n scripts/fork-ci-build.sh
+git diff --check
+```
+
+结果为 3 文件/121 项工作流测试、586 文件/2350 项完整测试及实际生产构建通过；两条既有 vi.unmock 警告保留。未改测试/断言/超时/并发，没有恢复 P5 实例或重跑设备验收。重复出现的空索引锁逐次核实 UID/inode/mtime 稳定、无 Git 进程和 lsof 占用后清理，不改索引数据；首个锁超过一小时，后续重现另存证据，不能据此断言根因已解决。证据留在 Git/Docker 忽略的 config/p6-feature-sync/evidence/，含 before、preview、stale-lock、merge-commit、install/lint/focused/test/build 日志。
+
+必要交接另建纯文档提交，FORK_AUTOMATION.md 只加基础 PR 历史上下文；提交前检查 Markdown 结构/链接、实际 diff/源码字节和 CI pin，不把 Markdown 无语言服务答复当 clean。最终推送 head 与新 Fork verification 的精确 head/App 15368、PR 测试快照、全部步骤和结果以 Git/GitHub 及本轮 CI 证据为准；不能继续套用 aba75941 或原 main 的绿色结果。
+
+PR #1 保持 Draft/未合并/无 auto-merge，main57acb02c 与基础 c64db269 不因本轮推送而移动，不修改保护/仓库设置。只读预检、写入控制器和定时均不另行 dispatch/启用，不发布或部署。真实上游更新写入、workflow-file 权限、实际定时触发、P5、镜像发布与回滚仍独立待办，下一步另行授权；无更新 no-op 不算写入正例。
+
 ## 10. 自有 CI 与镜像发布（失败门禁负例已验证，发布待开发）
 
 ### 10.1 已发现的上游适配点

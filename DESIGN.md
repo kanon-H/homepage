@@ -358,7 +358,9 @@ gethomepage/homepage main
 
 ## 11. 当前交付状态
 
-本次交接提交前，功能分支/远程为 feature/multi-address@6f9d53c3，PR #1 仍 open/draft/未合并。用户后续单独授权将基础 [PR #3](https://github.com/kanon-H/homepage/pull/3) Ready 后以 merge commit 合入 main：57acb02c，父为旧 main 2e5f1013 和基础 c64db269，19 文件的树与已审基础相同，未混入导航业务；源分支保留。新 main 的 push CI run 42452955655/check 128645880913 的 App 15368/head/全部步骤成功；只手动 dispatch 一次只读预检 run 42454077403，真实日志确认 main57acb02c/官方main2e5f1013/up-to-date，无候选树或冲突。完整保护/其他策略和默认 token read 不变、写入 opt-in 变量不存在、写入控制器 run 与同步 ref 均为 0；未执行真正更新 PR/CI 写入、发布部署或恢复 P5。仅更新 origin/main，不切换本地 main 或同步功能分支；feature 缺当前 main 的 2 个祖先提交，需另行授权 merge main/重跑 CI。三份交接随后已获用户单独授权，仅提交/推送当前 feature 分支，新 head CI 须重新核实；不在本次同步 main、改设置或执行写入控制器。证据和边界见 DEVELOPMENT 9.4；下列较早阶段保留为历史记录。
+功能分支已按本轮结构化授权将 Fork main57acb02c 保留历史 merge 到 feature/multi-address。纯合并提交 d34ccc1b62b1dd2d98646309fc2d0683b7bfea16 的双父顺序为已推送/CI 成功的 aba75941、main57acb02c；树 a2853c2d77dfd766502b5aad51a95865e1a9d9ba 与只读预演一致，无冲突，内容仅新增 FORK_AUTOMATION.md，不再缺 main 的两个祖先。业务、认证、Widget、依赖/锁文件、Docker 和工作流定义未改。在真实合并提交上 frozen/offline install、Lint、121 项工作流测试、586 文件/2350 项全量测试、隔离生产构建及脚本语法检查首次通过；两条既有警告保留，未弱化测试。必要交接独立文档提交，最终推送 head/新 CI 的精确 App/head/步骤按 GitHub 与 config/p6-feature-sync/evidence/ 另行核实，不以旧绿色代签。PR #1 保持 Draft/未合并；不改 main、保护或设置，不 dispatch 写入同步、不启用定时、不发布部署或恢复 P5。过程与边界见 DEVELOPMENT 9.5。
+
+此前基础 [PR #3](https://github.com/kanon-H/homepage/pull/3) 已按单独授权以 merge commit 合入 main57acb02c，父为旧 main2e5f1013 和基础 c64db269，19 文件的树与已审基础一致；源分支保留。main push CI run 42452955655/check 128645880913 的 App/head/全部步骤成功；仅一次手动只读预检 run 42454077403，真实日志为 main57acb02c/官方main2e5f1013/up-to-date，无候选树或冲突。写入控制器未实跑、opt-in 变量未创建，不证明真实更新 PR/CI、workflow-file 写入权限或实际每周调度。证据见 DEVELOPMENT 9.4；P5、真实写入、GHCR 双架构和回滚仍未完成，下列较早阶段保留为历史记录。
 
 当前分支 `feature/multi-address`，P4/P5 已按用户要求分别提交推送为 `808af4fa` / `d5ade7b6`。2026-11-06 又按用户确认的“main＋基础保护”补齐 P0 基础外部设置；P5 完整验收与 P6 仍未完成：
 

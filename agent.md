@@ -24,11 +24,19 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：基础已合入 main，main CI 与真实只读预检通过；写入同步仍未实跑
+## 当前状态：功能分支已同步 main 且本地验证通过；写入同步仍未实跑
 
-远程 main/origin/main 已为 `57acb02c54660114de4aeadd2473c16e90454f4c`。本次交接提交前，原工作树位于 `feature/multi-address@6f9d53c344d3fd3d53993dd161a39f2a4354dffa`，原 PR #1 保持 open/draft、未合并、auto_merge=null；没有将 main 合入功能分支。基础源分支 c64db269 保留，PR #3 已按本轮单独授权 Ready 后以 merge commit 合入。未创建写入定时变量、未执行写入控制器或发布部署，P5 仍暂停。
+远程 main/origin/main 保留 `57acb02c54660114de4aeadd2473c16e90454f4c`。本轮用户结构化授权将其 merge 到功能分支、更新必要交接、验证后非 force 推送并核查新 CI。纯合并提交为 `d34ccc1b62b1dd2d98646309fc2d0683b7bfea16`，本地已包含 main 的全部祖先；最终推送 head/CI 以 Git、GitHub 和忽略目录中的本轮证据为准，不以旧绿色代签。PR #1 仍须保持 Draft/未合并，基础源分支 c64db269 保留。不改 main/保护或 PR 状态，不运行写入同步、定时 opt-in、发布部署或恢复 P5。
 
-### P6 第八小步：main 入口与一次只读预检（已验证）
+### P6 第九小步：功能分支保留历史同步 main（本地验证完成）
+
+- 上轮三份交接已单独提交/推送为 aba75941，其真实 CI run 42464356595/check 128680299573 第一次成功，精确 head、App 15368 和全部步骤已核实；这仅作本轮基线，不替代后续新 head CI。
+- 只读预演 feature aba75941 与 main57acb02c 得到 clean-merge、无冲突。纯 merge 提交 d34ccc1b 的双父顺序为 aba75941、57acb02c，树 a2853c2d77dfd766502b5aad51a95865e1a9d9ba 与预演完全一致；内容仅新增 FORK_AUTOMATION.md，没有业务、认证、Widget、依赖/锁文件、Docker 或工作流定义变更。不 rebase/squash/force，也没有将功能 PR 合入 main。
+- 在真实 d34ccc1b 提交上 frozen/offline install、Lint、3 文件/121 项工作流测试、586 文件/2350 项完整测试、隔离虚构配置生产构建及两份 Node/一份 Bash 语法检查首次全部通过；仅两条既有 vi.unmock 警告，未改认证测试、断言、超时或并发。没有运行浏览器或恢复临时实例，本轮不能补签 P5。
+- 必要交接独立文档提交，并在 FORK_AUTOMATION.md 标明基础 PR 历史说明，避免将其 2023 项测试或“不含导航”误当当前功能分支状态。提交前静态/链接/范围检查及推送后精确 head、Fork verification/App 15368、PR 测试快照和全部步骤的核查结果，见 config/p6-feature-sync/evidence/；Markdown 无语言服务答复须记 inconclusive，而不是 clean。
+- 本轮只授权同步当前 Fork main 到功能分支、必要交接及验证后推送。不运行写入控制器、不创建 opt-in 变量、不合并 PR #1、不发布部署；真实上游写入演练、workflow-file 权限、每周调度实证、P5、GHCR 双架构与回滚仍未完成。下一步按新的单独授权处理，不能伪造上游更新或直接换 PAT/App。
+
+### P6 第八小步：main 入口与一次只读预检（历史记录；当前以上方为准）
 
 - 用户明确授权仅将基础 PR #3 标记 Ready、以 merge commit 合入 main，源分支保留、不改保护、不动 PR #1；main 自动 CI 通过后，只手动运行一次 fork-upstream-sync.yml，只读失败即停、不自动重跑。已披露 main 会带入每周只读预检配置；写入同步定时仍关闭。
 - 合并提交 57acb02c 的父精确为旧 main 2e5f1013 和基础 c64db269，树 12bdba3a121815817cacf01386f02d76d3a0a3b0 与已审基础 head 相同，19 文件 SHA256 逐项复核；没有导航、认证、Widget、依赖/锁文件或 Docker 变更。
