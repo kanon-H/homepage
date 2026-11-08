@@ -24,11 +24,22 @@
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
 - GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
 
-## 当前状态：独立基础 Draft PR #3 已过 CI；main 合并与同步实跑仍待授权
+## 当前状态：基础已合入 main，main CI 与真实只读预检通过；写入同步仍未实跑
 
-本次交接提交前，功能分支/远程为 `feature/multi-address@27139ebaa3c51f8d446287a596420732415fbbd9`，主 PR #1 保持 open/draft、未合并、auto_merge=null。独立基础分支为 `chore/fork-automation-bootstrap@c64db2699d7c9b26bbd359b7c08b8c5653587bbe`，main 仍 2e5f1013。用户本轮明确授权新分支提交/推送/创建 Draft PR，以及仅开启 Actions 创建/审批 PR 与 Issues；不合并、不启用定时、不发布部署或恢复 P5。
+远程 main/origin/main 已为 `57acb02c54660114de4aeadd2473c16e90454f4c`。本次交接提交前，原工作树位于 `feature/multi-address@6f9d53c344d3fd3d53993dd161a39f2a4354dffa`，原 PR #1 保持 open/draft、未合并、auto_merge=null；没有将 main 合入功能分支。基础源分支 c64db269 保留，PR #3 已按本轮单独授权 Ready 后以 merge commit 合入。未创建写入定时变量、未执行写入控制器或发布部署，P5 仍暂停。
 
-### P6 第七小步：独立自动化基础 PR 与最小外部设置（已验证，尚未合并）
+### P6 第八小步：main 入口与一次只读预检（已验证）
+
+- 用户明确授权仅将基础 PR #3 标记 Ready、以 merge commit 合入 main，源分支保留、不改保护、不动 PR #1；main 自动 CI 通过后，只手动运行一次 fork-upstream-sync.yml，只读失败即停、不自动重跑。已披露 main 会带入每周只读预检配置；写入同步定时仍关闭。
+- 合并提交 57acb02c 的父精确为旧 main 2e5f1013 和基础 c64db269，树 12bdba3a121815817cacf01386f02d76d3a0a3b0 与已审基础 head 相同，19 文件 SHA256 逐项复核；没有导航、认证、Widget、依赖/锁文件或 Docker 变更。
+- 新 main 的 [自动 push CI run 42452955655](https://github.com/kanon-H/homepage/actions/runs/42452955655) 第一次 completed/success，check 128645880913 的名称 Fork verification、App 15368、精确 main SHA 与全部步骤核实；不是沿用 PR 快照或旧 head。观察器一次网络断连仅重读，未 rerun CI。
+- [只读预检 run 42454077403](https://github.com/kanon-H/homepage/actions/runs/42454077403) 仅 dispatch 一次、attempt 1，全步骤成功。真实 job 日志报告 main=57acb02c、官方 refs/heads/main=2e5f1013、mode=read-only-preflight、outcome=up-to-date、candidate_tree_sha=null、conflicts=[]。日志 GITHUB_TOKEN 权限为 Contents/Metadata read；签名日志跳转不转发 Authorization，不保存签名 URL。
+- 现有两项设置保持开启、默认 token 仍 read，完整 main 保护/其他策略未变；FORK_UPSTREAM_SYNC_ENABLED 变量不存在，写入控制器 run 和同步 ref 均为 0。本轮不证明真实更新 PR/CI 写入、workflow-file 写权限、冲突 Issue 或每周定时实际触发；不能把 up-to-date 当写入正例。
+- 仅 fetch 更新本地 origin/main（不写 FETCH_HEAD），不 checkout/移动本地 main，也不 merge 到 feature。功能分支尚缺 main 的 2 个提交，需后续单独授权同步并重跑 CI；6f9d53c3 的旧绿色不代签新 main 基线。原 PR #1 未合并。
+- 证据在 Git/Docker 忽略的 config/p6-main-entry/evidence/：merge-before/response/verification、main-ci-verification、readonly-dispatch-intent/status/verification、readonly-job.log、completion 等。三份交接此前仅在原工作树本地更新；用户现另行明确授权，仅将其提交/推送当前 feature 分支，实际结果以 Git log/远程为准，新 head CI 必须另行核实。本次不包含将 main 合入功能分支或运行写入控制器的授权。
+- 下一步先确认保存交接及将 main merge 到功能分支的范围；真实写入控制器演练、写入定时、主 PR #1 合并、P5 和镜像/回滚仍独立待办，不替换 PAT/App 或造假上游更新来凑正例。
+
+### P6 第七小步：独立自动化基础 PR 与最小外部设置（历史准备记录；当前以上方为准）
 
 - 新建 [Draft PR #3](https://github.com/kanon-H/homepage/pull/3)：chore/fork-automation-bootstrap → 本 Fork main。以纯 main 2e5f1013 为父，只提取 feature@27139eba 的 18 个自动化文件，加自包含 FORK_AUTOMATION.md，共 19 文件；不包含导航功能、认证、Widget、依赖/锁文件或 Docker 改动，不带功能分支祖先。
 - 原 main 基线 frozen/offline install、Lint、573 文件/1902 测试及隔离构建通过；独立基础补丁为 3 文件/121 工作流测试、576 文件/2023 完整测试和生产构建通过，仍为两条既有 vi.unmock 警告。不要套用功能分支 2350 项计数。新交付 10 文件主动诊断 9 confirmed clean、1 Markdown inconclusive；Shell 用 bash -n，Prettier 无 Shell parser 的工具错误保留，未改源码或测试掩盖。
@@ -276,7 +287,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-独立基础 Draft PR #3/c64db269 的真实 CI 已通过，两项必要设置已核验。下一步先取得单独的主分支合并授权，再将基础 PR 标记 Ready、以 merge commit 合入 main；不要合并含 P5 未完成导航功能的主 PR #1。默认入口进入 main 后，再分别授权手动预检、真实同步 PR/CI 演练和定时 opt-in；当前没有自动同步在运行，上游无更新的 no-op 不能代替真实正例。基础 PR 合并后，功能分支还需另行 merge main 并重跑 CI，不 rebase/force。详见 DEVELOPMENT 第 9.3 节；本轮随后已获用户单独授权，仅提交/推送原工作树三份交接；不代表合并 PR 或执行同步的授权，镜像发布/回滚仍待开发。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
+main 57acb02c 的新 CI 和一次手动只读预检已通过，官方 main 目前无新更新。下一步先确认保存本地交接和将 main merge 到 feature/multi-address 的授权范围，再同步功能分支并重跑 CI；不 rebase/force、不合并 PR #1。写入控制器尚无任何真实 run/PR 正例，执行它可能在上游更新时创建分支/PR，须单独授权；不能把当前 up-to-date 当写入已验证。每周只读配置已进入 main，但定时实际触发未验；写入 opt-in 变量未创建。详见 DEVELOPMENT 9.4；本轮已获用户单独授权，仅提交/推送原工作树三份交接；功能分支同步、PR #1 合并和写入演练仍未授权，镜像发布/回滚仍待开发。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
