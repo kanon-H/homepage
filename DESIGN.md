@@ -346,6 +346,8 @@ gethomepage/homepage main
 
 ## 10. 发布与长期存储
 
+**最新用户决定：发布正式多地址镜像，不采用预览/直接合PR #1的更快路线；仅P5手机兼容验证延期，其余必需工作先完成。** 手机已知差异不算通过，行为/认证/缓存合同不改，见SPEC12.1。继续独立PR #4基础集成与验证，完成非手机验收后同步最新main并审查PR #1，再验证最终含导航的同一正式OCI归档。基础main镜像没有导航，不能当成本次正式交付。DEVELOPMENT14逐阶段列出放行/证据/授权；当前workflow仅有结构冒烟，HTTP/完整安全验收须补足并实跑，不宣称所有新门禁已自动实现。
+
 用户本轮选择 Docker Hub，替代原 GHCR 优先计划；镜像默认 Docker Hub 用户名/homepage，可用 DOCKERHUB_IMAGE 指定组织仓库。自有版本仅接受 fork-vX.Y.Z，与上游 v* 标签区分，不发布 latest。新工作流与四份stdlib发布工具已独立提交89f0a542并创建Draft PR #4，其真实应用CI通过；尚未合入main或实跑镜像，实际启用/发布需要后续授权和设置。配置与完整操作见[发布指南](docs/more/fork-release.md)，开发追踪见 DEVELOPMENT 第 13 节。
 
 Fork 专用 Dockerfile.fork/白名单 context 不修改上游 Dockerfile：同 Alpine 的 Node24.22.1 多平台 digest、pnpm10.34.9、GPL-3.0-only 和 LICENSE 固定。main-only 控制器验证真实 main/tag/祖先及发布关键文件；版本标签通知只 dispatch main，不执行候选代码或读注册表凭据。无 Docker Hub 凭据的 build job 从 Git 对象导出安全 context，重跑质量门禁、构建双架构 OCI 并做两平台运行时结构冒烟。独立 Environment publisher 只运行可信 main 代码，验证同一 build artifact ID/SHA 与 OCI 元信息后原样 copy，不在持有注册表凭据时重建/安装应用代码。Token 用未链接 tmpfs FD，仅在内存，不进入镜像、argv 或子进程环境。
@@ -362,9 +364,11 @@ Fork 专用 Dockerfile.fork/白名单 context 不修改上游 Dockerfile：同 A
 
 ## 11. 当前交付状态
 
-本轮按用户结构化授权交付独立发布基础：89f0a542唯一父为main57acb02c，无feature祖先，仅10个发布文件，Draft PR #4指向本Fork main。纯main基线576文件/2023测试，基础补丁577文件/2089测试、187项工作流/安装/Lint/隔离应用构建通过；独立工作树主动诊断7 clean、2 Docker unsupported、1 MD inconclusive。真实run42552833352/check128951971443、App15368、精确head/全部步骤成功，PR测试树等于基础树。main/保护/设置未变，PR #1/#4均Draft，未Ready/merge或dispatch/发布。原feature13项另获本轮提交推送与新CI核查授权，实际保存head/CI按Git/GitHub和本轮证据；保留文档自动格式化。P6-R02仍缺人工合并/main CI，R03之后仍待授权，详见DEVELOPMENT10.6/13。
+本轮只详细记录并提交/推送正式发布规划。提交前feature为93732202、真实CI run42555188788/check128959208179成功；main57acb02c与基础PR #4/head89f0a542未变，两PR仍Draft。最新方向已同步SPEC12.1/DEVELOPMENT13～14/agent与发布指南：只延期手机兼容、其余必需验收完成后正式发布，不走直接合PR #1预览捷径，也暂不开发Skill。实际新文档head/CI以Git/GitHub及config/p6-formal-plan/evidence为准；本轮不合并、不dispatch、不改Secrets/opt-in或发布部署。
 
-上一轮在feature@c89b6a93增加独立Docker Hub发布基础、66项新测试与指南并更新规划，开发阶段未提交/推送/改外部设置或真实发布；本轮提交/PR状态以上方为准。最终 frozen/offline install、Lint、187 项工作流测试、587 文件/2416 项全量测试及隔离应用构建通过；主动诊断6 confirmed clean、2 unsupported、5 inconclusive，细分与证据见 DEVELOPMENT 10.5/config/p6-release/evidence，不能称全静态clean；本机没有 Docker/Podman，实际双架构容器/推送/拉取/回滚仍待验。后续开发用 DEVELOPMENT 13 的固定 ID 跟踪，不能将 YAML 存在或旧 c89 CI 绿灯当已完成。P5 仍暂停，不合并 PR #1。
+上一轮按用户结构化授权交付独立发布基础：89f0a542唯一父为main57acb02c，无feature祖先，仅10个发布文件，Draft PR #4指向本Fork main。纯main基线576文件/2023测试，基础补丁577文件/2089测试、187项工作流/安装/Lint/隔离应用构建通过；独立工作树主动诊断7 clean、2 Docker unsupported、1 MD inconclusive。真实run42552833352/check128951971443、App15368、精确head/全部步骤成功，PR测试树等于基础树。main/保护/设置未变，PR #1/#4均Draft，未Ready/merge或dispatch/发布。原feature13项另获本轮提交推送与新CI核查授权，实际保存head/CI按Git/GitHub和本轮证据；保留文档自动格式化。P6-R02仍缺人工合并/main CI，R03之后仍待授权，详见DEVELOPMENT10.6/13。
+
+上一轮在feature@c89b6a93增加独立Docker Hub发布基础、66项新测试与指南并更新规划，开发阶段未提交/推送/改外部设置或真实发布；本轮提交/PR状态以上方为准。最终 frozen/offline install、Lint、187 项工作流测试、587 文件/2416 项全量测试及隔离应用构建通过；主动诊断6 confirmed clean、2 unsupported、5 inconclusive，细分与证据见 DEVELOPMENT 10.5/config/p6-release/evidence，不能称全静态clean；本机没有 Docker/Podman，实际双架构容器/推送/拉取/回滚仍待验。后续开发用 DEVELOPMENT 13 的固定 ID 跟踪，不能将 YAML 存在或旧 c89 CI 绿灯当已完成。当时P5暂停且未合PR #1；当前仅手机兼容延期，非手机验收待完成，以上方正式路线为准。
 
 上一轮功能分支已按结构化授权将 Fork main57acb02c 保留历史 merge 到 feature/multi-address。纯合并提交 d34ccc1b62b1dd2d98646309fc2d0683b7bfea16 的双父顺序为已推送/CI 成功的 aba75941、main57acb02c；树 a2853c2d77dfd766502b5aad51a95865e1a9d9ba 与只读预演一致，无冲突，内容仅新增 FORK_AUTOMATION.md，不再缺 main 的两个祖先。业务、认证、Widget、依赖/锁文件、Docker 和工作流定义未改。在真实合并提交上 frozen/offline install、Lint、121 项工作流测试、586 文件/2350 项全量测试、隔离生产构建及脚本语法检查首次通过；两条既有警告保留，未弱化测试。必要交接独立文档提交，最终推送 head/新 CI 的精确 App/head/步骤按 GitHub 与 config/p6-feature-sync/evidence/ 另行核实，不以旧绿色代签。PR #1 保持 Draft/未合并；不改 main、保护或设置，不 dispatch 写入同步、不启用定时、不发布部署或恢复 P5。过程与边界见 DEVELOPMENT 9.5。
 

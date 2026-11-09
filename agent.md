@@ -22,13 +22,22 @@
 - 认证完全复用现有密码门禁/OIDC，个人场景不需要用户系统。
 - 配置继续用 YAML；偏好保存在浏览器，当前没有数据库。
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
-- GitHub Actions 测试并发布 Docker Hub 镜像（用户本轮选择，替代原 GHCR 优先计划）；Gitea 单向备份可后续做。
+- GitHub Actions 测试并发布 Docker Hub 镜像；Gitea 单向备份仍可选。
+- 最新发布目标是正式多地址镜像：仅P5手机兼容验收延期，其余必需工作完成后发布；不采用预览/直接合PR #1的更快路线，不开发Skill。手机已知差异保留为延期未完成，见SPEC12.1及DEVELOPMENT14。
 
-## 当前状态：独立发布基础 Draft PR #4 的真实 CI 通过；未合入 main 或实跑镜像
+## 当前状态：正式发布规划已确认；仅延期手机兼容，其余必需验收待完成
 
-发布基础已独立提交/推送为 89f0a54238fee80cdf843bde416459e9f1b3c8da，并创建 [Draft PR #4](https://github.com/kanon-H/homepage/pull/4)，main 保留 57acb02c，导航 PR #1 保持 Draft/未合并。本轮用户结构化授权独立分支验证后提交/非 force 推送/建 Draft PR，另将原 feature 的13项本地变更（含文档自动格式化）一并提交/推送并核新 CI。原 feature 本次保存前为 c89b6a93，最终保存 head/CI 以 Git/GitHub 和本轮证据为准；不沿用旧绿。没有授权或执行 PR Ready/合并、workflow dispatch、设置/Secrets/opt-in、镜像发布部署或恢复 P5。
+本次规划提交前feature/远程为937322028c87ec1ea3023182ec7589a2adf878aa，其真实CI run42555188788/check128959208179、App15368、全部步骤成功；发布基础89f0a542和 [Draft PR #4](https://github.com/kanon-H/homepage/pull/4) 已有独立真实CI，main仍57acb02c。PR #1/#4都Draft/未合并，导航不在main，尚无真实Docker镜像构建/Hub发布证据。本轮仅按用户要求详细记录后续正式流程，并将当前文档提交/推送feature、核新head CI；不沿用937旧绿色，也不合并/dispatch/改Secrets或启用发布/部署。
 
-### P6 第十一步：独立发布基础 PR 与 feature 保存（本轮授权）
+### P6 第十二小步：正式发布条件与后续门禁（最新用户决定）
+
+- 用户未接受“预览版优先/直接合PR #1”的更快建议，继续原独立基础PR #4路线。只有P5实际手机浏览器导航、触屏/布局兼容验证延期；小米/QQ同页差异未解决，不能记通过或改导航补丁。SPEC12.1只记录手机排期例外，不削弱功能/安全合同。
+- 非手机P5必须补齐：桌面中键/完整键盘焦点/Widget统计与原生交互，适用的OIDC/目标反代缓存/Host与匿名隔离。当前未执行仍是未完成；无设备不算通过，N/A需用户确认适用范围。
+- DEVELOPMENT13～14详细列固定ID与F01～F12：独立基础入main/新CI →真实基础构建和完善HTTP镜像验证 →非手机P5及其它既有必需验收 →最新main同步feature/新CI →单独审查PR #1合main →最终正式run同一OCI归档完整验证 →Hub设置/不可变规则/回退演练 →正式推送与独立拉取交付。早期基础镜像没有导航，不能当正式成果。
+- 上游写入/调度/门禁补充验证继续跟踪，缺真实更新或环境记录为阻塞/待用户决定，不用no-op/模拟冒充完成；R09供应链增强/Gitea保留原后续可选性，Skill暂不开发。
+- 本轮只改规划/交接/规范和指南并提交推送，不做上述Git合并或发布操作；实际新head/CI以Git/GitHub和config/p6-formal-plan/evidence为准。下一次从单独授权F01开始，按阶段停止和交接。
+
+### P6 第十一步：独立发布基础 PR 与 feature 保存（历史；已交付）
 
 - 隔离工作树 config/p6-release-bootstrap/worktree，分支 chore/fork-dockerhub-release-bootstrap，直接从 main57acb02c 起步。89f0a542 唯一父为该 main，树 bb64c8f512f9872fe0f118e3a9e28996f5b0ed62，仅10个发布文件/1471行新增，无 feature 祖先、导航、认证、Widget、依赖/锁文件、原 Docker/CI 定义改动。
 - 纯 main 基线为576文件/2023测试；发布基础为577文件/2089测试、187项工作流测试，安装锁文件/Lint/隔离应用构建/格式/语法通过，均首次全量成功。7个代码/YAML主动诊断clean，2个Docker路径unsupported、1份Markdown inconclusive；不能套用功能分支2416计数，也不称真实镜像构建完成。
@@ -311,9 +320,9 @@ P0 实际验证：
 
 ## 建议下一步
 
-独立发布基础 Draft PR #4 已创建且精确 head CI通过，P6-R02 的下一步是单独授权审查后标记Ready、以merge commit合入main并核新main CI；不要为此提前合并含未完成 P5 的 PR #1。原feature13项保存/推送已获本轮授权，实际新head与CI结果以Git/GitHub及本轮证据为准。随后按 P6-R03 在可信 main 真正运行无 Docker Hub 凭据的 build-only/容器验收，再由所有者配置 Environment Secrets 与 Hub 不可变策略，明确启用 opt-in，逐项做首次发布、独立拉取和旧 digest 回滚。Docker Hub Token 不发给 Agent。流水线尚未真实运行，默认关闭发布，不能将当前本地测试代签后续阶段。真实上游写入/每周调度仍按 P6-S01 独立授权和验证，不伪造更新、不直接换 PAT/App；上次只读 up-to-date 不代表当前官方没有新更新。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
+按DEVELOPMENT14的正式路线，下一步仍是单独授权审查PR #4、Ready/merge commit入main并核新main CI（F01），再获准执行无Hub凭据的真实build-only及补足HTTP镜像验证。非手机P5和其它必需验收需完成；随后同步最新main到feature、核最新CI，再单独决定PR #1合入main，对最终含导航源码的同一正式OCI归档重新验证。用户已明确不采用直接合PR #1的更快/预览路线。仅P5手机兼容延期，其他未完成项保持待办，不假定豁免；上游无真实更新时也不能把no-op算写入验收。Docker Hub Token由用户自己在Environment设置，不进聊天。本轮只是规划提交/推送，不执行F01或恢复实例。下列非手机验收按设备/目标环境与后续授权执行，手机项目继续延期：
 
-1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
+1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补非手机的完整键盘焦点/Widget统计等场景，实际手机触屏/兼容项继续延期。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
 3. 使用说明在 `docs/configs/network.md`；按需复跑 `scripts/network-acceptance.py --build --insecure-http ...`。不得跳过 SPEC 的手工完成定义，不自动提交、推送、发布或部署。
 
