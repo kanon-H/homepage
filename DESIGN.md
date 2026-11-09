@@ -346,7 +346,7 @@ gethomepage/homepage main
 
 ## 10. 发布与长期存储
 
-**最新用户决定：发布正式多地址镜像，不采用预览/直接合PR #1的更快路线；仅P5手机兼容验证延期，其余必需工作先完成。** 手机已知差异不算通过，行为/认证/缓存合同不改，见SPEC12.1。继续独立PR #4基础集成与验证，完成非手机验收后同步最新main并审查PR #1，再验证最终含导航的同一正式OCI归档。基础main镜像没有导航，不能当成本次正式交付。DEVELOPMENT14逐阶段列出放行/证据/授权；当前workflow仅有结构冒烟，HTTP/完整安全验收须补足并实跑，不宣称所有新门禁已自动实现。
+**最新用户决定：发布正式多地址镜像，不采用预览/直接合PR #1的更快路线；仅P5手机兼容验证延期，其余必需工作先完成。** 手机已知差异不算通过，行为/认证/缓存合同不改，见SPEC12.1。继续独立PR #4基础集成与验证，完成非手机验收后同步最新main并审查PR #1，再验证最终含导航的同一正式OCI归档。基础main镜像没有导航，不能当成本次正式交付。DEVELOPMENT14逐阶段列出放行/证据/授权；已提交基础仍仅有结构冒烟；最新本地F03增加原生密码/HTTP/Host/私有缓存/挂载/PID1身份/健康验证并接入build job，但须受审进入可信main及真实Docker实跑后才能计入镜像证据。native standalone的103项检查不替代容器或目标OIDC/HTTPS/CDN验收。
 
 用户本轮选择 Docker Hub，替代原 GHCR 优先计划；镜像默认 Docker Hub 用户名/homepage，可用 DOCKERHUB_IMAGE 指定组织仓库。自有版本仅接受 fork-vX.Y.Z，与上游 v* 标签区分，不发布 latest。新工作流与四份stdlib发布工具已独立提交89f0a542并创建Draft PR #4，其真实应用CI通过；尚未合入main或实跑镜像，实际启用/发布需要后续授权和设置。配置与完整操作见[发布指南](docs/more/fork-release.md)，开发追踪见 DEVELOPMENT 第 13 节。
 
@@ -364,7 +364,9 @@ Fork 专用 Dockerfile.fork/白名单 context 不修改上游 Dockerfile：同 A
 
 ## 11. 当前交付状态
 
-本轮只详细记录并提交/推送正式发布规划。提交前feature为93732202、真实CI run42555188788/check128959208179成功；main57acb02c与基础PR #4/head89f0a542未变，两PR仍Draft。最新方向已同步SPEC12.1/DEVELOPMENT13～14/agent与发布指南：只延期手机兼容、其余必需验收完成后正式发布，不走直接合PR #1预览捷径，也暂不开发Skill。实际新文档head/CI以Git/GitHub及config/p6-formal-plan/evidence为准；本轮不合并、不dispatch、不改Secrets/opt-in或发布部署。
+最新本轮从8822dba6继续F03本地开发：新增stdlib HTTP工具、同归档两平台/两挂载模式必经验证、40项回归；588文件/2456测试与native standalone103项HTTP检查通过。认证边界测试仅新增实路由beforeAll准备/afterAll恢复，未改58项断言、默认超时/并发或生产认证；未修改8822隔离基线也复现了原冷导入超时，失败日志保留。本轮未提交推送、变更PR/main/设置、dispatch或发布部署；真实Docker和全部其他必需门禁仍待完成，详见DEVELOPMENT15。
+
+上一轮只详细记录并提交/推送正式发布规划。提交前feature为93732202、真实CI run42555188788/check128959208179成功；main57acb02c与基础PR #4/head89f0a542未变，两PR仍Draft。最新方向已同步SPEC12.1/DEVELOPMENT13～14/agent与发布指南：只延期手机兼容、其余必需验收完成后正式发布，不走直接合PR #1预览捷径，也暂不开发Skill。实际新文档head/CI以Git/GitHub及config/p6-formal-plan/evidence为准；本轮不合并、不dispatch、不改Secrets/opt-in或发布部署。
 
 上一轮按用户结构化授权交付独立发布基础：89f0a542唯一父为main57acb02c，无feature祖先，仅10个发布文件，Draft PR #4指向本Fork main。纯main基线576文件/2023测试，基础补丁577文件/2089测试、187项工作流/安装/Lint/隔离应用构建通过；独立工作树主动诊断7 clean、2 Docker unsupported、1 MD inconclusive。真实run42552833352/check128951971443、App15368、精确head/全部步骤成功，PR测试树等于基础树。main/保护/设置未变，PR #1/#4均Draft，未Ready/merge或dispatch/发布。原feature13项另获本轮提交推送与新CI核查授权，实际保存head/CI按Git/GitHub和本轮证据；保留文档自动格式化。P6-R02仍缺人工合并/main CI，R03之后仍待授权，详见DEVELOPMENT10.6/13。
 

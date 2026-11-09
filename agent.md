@@ -25,9 +25,17 @@
 - GitHub Actions 测试并发布 Docker Hub 镜像；Gitea 单向备份仍可选。
 - 最新发布目标是正式多地址镜像：仅P5手机兼容验收延期，其余必需工作完成后发布；不采用预览/直接合PR #1的更快路线，不开发Skill。手机已知差异保留为延期未完成，见SPEC12.1及DEVELOPMENT14。
 
-## 当前状态：正式发布规划已确认；仅延期手机兼容，其余必需验收待完成
+## 当前状态：F03 镜像 HTTP 验证工具已本地实现；真实双架构实跑仍待授权
 
-本次规划提交前feature/远程为937322028c87ec1ea3023182ec7589a2adf878aa，其真实CI run42555188788/check128959208179、App15368、全部步骤成功；发布基础89f0a542和 [Draft PR #4](https://github.com/kanon-H/homepage/pull/4) 已有独立真实CI，main仍57acb02c。PR #1/#4都Draft/未合并，导航不在main，尚无真实Docker镜像构建/Hub发布证据。本轮仅按用户要求详细记录后续正式流程，并将当前文档提交/推送feature、核新head CI；不沿用937旧绿色，也不合并/dispatch/改Secrets或启用发布/部署。
+从feature/multi-address@8822dba60a34cf6179077117ac3fdd5dbce99f3a继续本地开发，保留原DEVELOPMENT表格格式化。旧head的真实CI run42577634798/check129028827539已通过，但不能代签本轮尚未提交的改动。本地开发阶段未写远程；随后用户已分别授权保存/独立PR #4更新、受审CI通过后Ready/merge #4及main CI、一次publish=false/空版本双架构实跑。操作按条件推进、失败停止，精确结果以Git/GitHub及本轮evidence为准；不动PR #1/保护/Secrets/Hub发布或生产。独立发布基础仍须经受审集成和精确CI后才能实跑。只有手机兼容延期，正式路线不变。
+
+### P6 第十三小步：F03 本地工具与原生 HTTP 回归
+
+- 新增 scripts/fork-image-http.mjs，并接入 fork-image-smoke/build job 的必经步骤及 RELEASE_FILES 可信main一致性校验。两架构各检查默认root+/app/config及PUID10001/PGID10002+/config：实际健康状态、PID1身份、挂载内容/写权限及HTTP登录前后YAML不变。
+- 原生密码/CSRF、错误密码、登录/退出、首页/服务/书签/Widget/Next数据私有缓存与匿名隔离、Host负例和SSR/API一致性均有验证。固定loopback连接、不跟随重定向、Cookie只在内存；随机虚构配置卷与测试密码，不读取真实配置或传递宿主凭据。按唯一标签和精确名称清理，不prune共享资源；归档验证前后SHA一致才允许上传。
+- 新增40项测试，工作流227项；默认完整Vitest为588文件/2456项通过。实际新构建的native standalone通过103项HTTP检查，临时进程和配置已清理；这不是Docker/QEMU、OIDC、HTTPS/CDN或P5人工验收。
+- 初次native测试发现Next数据使用x-nextjs-redirect，已按真实协议补验证及恶意/冲突重定向负例。全量也复现既有认证模块冷导入超时，未修改8822基线同样失败；仅将真实路由预加载移到认证测试beforeAll并补afterAll环境恢复，58项既有用例/断言、默认超时和并发不变，完整重跑通过。原失败与基线证据保留在config/p6-image-http/evidence。
+- 本机仍无Docker/Podman/Skopeo；HTTP工具尚未进入独立PR #4/main，无真实容器、镜像或Hub结果。下一步先明确保存/推送及独立基础更新授权，受审后再分别授权F01与一次publish=false实跑；不直接合PR #1或发布。
 
 ### P6 第十二小步：正式发布条件与后续门禁（最新用户决定）
 

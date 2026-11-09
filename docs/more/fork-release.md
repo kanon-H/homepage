@@ -8,7 +8,7 @@
 
 继续原顺序：先独立发布基础PR #4入main和基础验证，再补其余验收、将最新main合入feature并审查导航PR #1，最后对含导航的正式main源码/同一发布归档重做门禁。**不直接合PR #1赶发预览版，也不把无导航的基础镜像当正式成果。** 正式版本号与发布操作另行确认；现有fork-vX.Y.Z示例不是已经决定或发布的版本。完整固定ID与F01～F12执行表在功能分支的DEVELOPMENT13～14，规范延期范围在SPEC12.1。
 
-当前流水线的Node结构冒烟尚不等于HTTP/登录/挂载验证；这些是待补代码和真实执行的要求，不能仅开发布变量就声称全部完成。本轮只提交规划文档，不合并、dispatch、配置凭据、发布或部署。
+已提交的发布基础仅有Node结构冒烟。最新本地F03工具已接入HTTP/登录/挂载等必经验证，但尚未提交、进入独立PR #4/main或真实Docker实跑。native standalone的103项检查只能证明直接HTTP逻辑，不是两平台容器、OIDC/HTTPS/CDN或完整P5结果；不能仅开发布变量就声称全部完成。所有Git/Actions写入仍须明确授权；HTTP工具完成不自动授权凭据配置、镜像推送或部署。
 
 ## 1. 信任边界与流程
 
@@ -19,11 +19,19 @@
 3. 自有标签 push 的 **Fork version tag notification** 不 checkout 或执行标签代码，不接触注册表凭据，只向 main 的发布控制器发一次 dispatch。HTTP204 仅说明请求被接受，需查看另一个发布 run。拒绝 rerun 通知任务；未知响应先查询实际 main runs，不盲重发。
 4. main 控制器核对事件/工作流来源、实时 main、标签实际 commit 和祖先，固定官方 main 只读查询并记录共同上游基线。规划和发布前分别读取 main/tag，检测到改动则停止；不是自动追最新提交，也不是跨 GitHub/Hub 的原子事务，仍需不可变版本标签规则兜底。
 5. 无注册表凭据的 build job：精确源码/Node/pnpm、frozen install、Lint、全量测试、隔离应用构建；从 Git 对象导出允许文件组成 context，再分别构建 amd64/arm64，禁止复用宿主 `.next`/node_modules。输出 OCI archive。
-6. 上传前核查两架构和版本/源码/上游/GPL 标签，并通过 QEMU 分别启动 Node 检查运行时文件与配置边界。**这是运行时结构冒烟，不是应用 HTTP 登录、物理 ARM 或 P5 全量验收**。
+6. 上传前核查两架构和版本/源码/上游/GPL标签。最新F03实现中，fork-image-smoke先固定归档SHA，再从同归档分别导入amd64/arm64，做Node结构检查并启动真实应用；每平台检查默认root+/app/config及PUID10001/PGID10002+/config，必须完成健康、PID1身份、卷读写、HTTP密码登录/退出、Host、匿名与私有缓存和SSR/API/Next数据一致性。归档前后SHA不变才继续上传。此代码须受审进入main并实跑，**不替代物理ARM、OIDC、HTTPS/CDN、真实NAS文件系统或P5人工验收**。
 7. publisher 等待 `dockerhub-release` Environment；只运行 main 控制器，不安装应用依赖、不重建、不执行 artifact 脚本。下载同一 build job 的精确 artifact ID，核对 archive SHA256，再核对实时 main/tag 和镜像标签。
 8. Docker Hub 两个目标标签均不存在时，才各 copy 一次：`fork-vX.Y.Z`、`sha-<完整源码SHA>`。不更新 latest、主次版本别名或已有标签。复制后读回 digest 必须与测试的 OCI index 一致，输出 `release.json`。
 
 全部 job 的 GITHUB_TOKEN 默认仅 contents:read；plan/publisher 另有 actions:read，只读核验 Environment 保护，只有无注册表凭据的 tag 通知 job 获得 actions:write。没有 packages:write、生产部署或自动合并权限。内置 token 生成的普通 push/tag 事件不保证触发另一个 workflow；未来若由机器人创建版本标签，应显式调用可信 main 控制器，不能假设普通触发有效。
+
+### 1.1 F03 隔离验证边界
+
+- scripts/fork-image-http.mjs使用随机虚构JSON/YAML配置、随机测试密码和Secret；真实配置和生产凭据不进入容器、argv、日志或artifacts。随机测试密码/Secret经Docker stdin提供，不创建环境文件；不继承宿主GitHub/Hub/NextAuth凭据或Docker远程连接设置。
+- 端口只映射127.0.0.1随机端口，原生Host校验保持启用。HTTP客户端不使用代理、不跟随重定向、限制响应大小及等待时间；检查Location和Next数据的x-nextjs-redirect，两者存在时均须为同源登录页。
+- 结构及配置种子容器禁网；应用使用临时bridge，不是断外网沙箱。使用独立命名配置卷，不挂宿主config、Docker socket或生产数据；不启用privileged/host网络/重启策略。运行后只按唯一label及精确名称清理本轮容器/卷，不使用prune，失败阻止上传。目标NAS绑定卷/反代缓存仍独立验收。
+- 每平台每挂载模式仅记录platform/mount/uid/gid/checks/healthy，Cookie保存在内存且退出后不手工清空客户端Cookie来冒充登出成功。HTTP前后按原始字节检查YAML，拒绝挂载未生效或HTTP请求改写配置；浏览器模式切换仍由P5单独验收。
+- 当前本机无Docker，native standalone只验证了原生密码和直接HTTP流程；不宣称上述容器门禁已真实执行。新helper已加入RELEASE_FILES，不能选择缺少/改动该控制器的老tag绕过可信main校验。
 
 ## 2. 先集成，再配置（均需另行授权）
 
@@ -63,7 +71,7 @@ Docker Hub 密钥只传给 publisher 的一个步骤；Skopeo 使用 Linux tmpfs
 
 1. 单独授权PR #4审查/Ready/merge入main，核新main精确CI；不沿用旧head绿色，不提前合PR #1。
 2. 获准后仅运行main `publish=false`、空版本的基础双架构构建。记录实际Docker/OCI/Skopeo/context/结构冒烟及archive SHA，不登录或推送Hub；无导航时不能当正式成果。
-3. 补足可重复HTTP/原生认证/Host/匿名隔离/配置挂载/PUID/健康验证，接入build job，测试代码和真实容器结果均需受审；当前结构脚本并未自动实现全部这些门禁。
+3. 本地F03已补足可重复HTTP/原生认证/Host/匿名隔离/配置挂载/PUID/健康验证并接入build job；先受审集成最新工具，再在同一真实归档上实跑。当前native103项及模拟Docker测试不能代签容器门禁，未通过不上传归档或进入publisher。
 4. 完成非手机P5和适用目标安全验收，保留真实OS/浏览器/设备/配置代号。其它现有必需验收如上游写入/权限/调度或门禁负例也继续逐项给证据；若外部条件不足记阻塞，不能自行N/A或no-op代签。仅手机兼容延期。
 5. 保存工作后将最新main保留历史merge到feature，审查二开/发布关键文件和指南冲突；完整回归及新head CI通过后，单独授权PR #1 Ready/merge到main并核main CI。
 6. 对最终**含多地址功能**的main源码重新验证双架构和全部适用镜像门禁。正式run中实际推送的**同一OCI归档**必须通过HTTP/认证等检查；另一轮build-only的不同version/created/digest不能代替。失败先修复和受审，不降低断言。

@@ -1,7 +1,7 @@
 # 二开实施、测试与上游维护手册
 
 > 本文全部路径相对仓库根目录。新会话直接在本目录启动，无需父目录或其他项目。
-> 当前正式发布方向：不采用预览版快速路线；仅P5手机兼容验证延期，非手机P5及其余必需验收完成后再正式交付多地址Docker Hub镜像，见SPEC12.1和本文14。当前只记录并提交/推送文档，不自动合并/构建/发布。P1～P4及P5自动化已完成，其余状态按13～14逐项保留。P6 自动化基础已合入 main，功能分支同步 main 后 c89b6a93 的真实 CI 通过；Docker Hub 发布基础已独立提交89f0a542、创建Draft PR #4并核实真实应用CI成功，尚未合入main/启用；原feature13项另获本轮提交/推送授权，实际新head CI另核。真实镜像构建、发布/拉取/回滚与上游写入仍待验证。第 13 节为当前后续工作追踪表，第 5/9 节保留历史阶段证据，不能用旧记录代签新交付。
+> 当前正式发布方向：不采用预览版快速路线；仅P5手机兼容验证延期，非手机P5及其余必需验收完成后再正式交付多地址Docker Hub镜像，见SPEC12.1和本文14。正式规划已保存；最新继续F03本地工具开发与回归，尚未提交/推送，不自动合并、运行Actions或发布。P1～P4及P5自动化已完成，其余状态按13～14逐项保留。P6 自动化基础已合入 main，功能分支同步 main 后 c89b6a93 的真实 CI 通过；Docker Hub 发布基础已独立提交89f0a542、创建Draft PR #4并核实真实应用CI成功，尚未合入main/启用；原feature13项另获本轮提交/推送授权，实际新head CI另核。真实镜像构建、发布/拉取/回滚与上游写入仍待验证。第 13 节为当前后续工作追踪表，第 5/9 节保留历史阶段证据，不能用旧记录代签新交付。
 
 ## 1. 阅读顺序
 
@@ -767,10 +767,10 @@ shell PATH 未发现 Docker/Podman/独立 actionlint，不由此推断托管诊�
 
 | ID      | 当前状态                                 | 依赖 / 下一步                                                                                                           | 完成所需证据                                                                        |
 | ------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| P6-R01  | 本地实现与验证完成；见 10.5              | 四份发布工具、两工作流、独立 Dockerfile/context、66项测试与指南；基础提交89f0a542已交付                                 | 本地命令/诊断/文件范围与校验和；不能替代 Docker 实跑                                |
+| P6-R01  | 原基础已交付；F03增量本地验证完成        | 第五份HTTP工具/40项新增测试/原生103项检查；待明确保存与独立PR #4更新授权，见15节                                        | 完整2456测试/命令/范围/哈希；增量未提交，不替代Docker或新head CI                    |
 | P6-R02  | Draft PR #4/CI通过；待人工合并           | 已从main独立提交/推送10文件；保持Draft，Ready/merge须另授权，不提前合并导航                                             | #4/head89f0a542/run42552833352已核实；main尚未合入，后续另核其CI                    |
 | P6-R03  | 待 R02/main 入口及运行授权               | main 的 publish=false、空版本，无 Docker Hub 凭据真实构建；本机无 Docker/Podman                                         | 双平台 OCI、白名单 context、两平台结构冒烟、archive SHA/run                         |
-| P6-R04  | 待 R03/临时 Docker 验收授权              | 实际容器 HTTP/原生认证/Host/配置挂载/PUID/健康，不操作生产                                                              | 隔离容器结果、平台/源码/digest/配置代号；不是仅 Node 文件检查                       |
+| P6-R04  | 工具本地实现；真实容器待main/运行授权    | 最新F03接入无Hub凭据build job，双平台/双挂载的HTTP/原生密码/Host/PID1/健康为必经步骤，不操作生产                        | 同归档真实容器结果/平台/源码/digest；native103项和模拟Docker不能代签                |
 | P6-R05  | 待所有者配置                             | 目标 Hub 仓库/可见性/不可变规则、Git 标签保护、main-only Environment/reviewer 和最小权限 Secrets；不把 Token 发给 Agent | 脱敏设置读回/生效验证，R03/R04 后才明确启用 DOCKERHUB_RELEASE_ENABLED               |
 | P6-R06  | 待 R03～R05 和真实发布授权               | 新 fork-vX.Y.Z 标签或 main 显式 publish；通知成功不等于发布成功                                                         | main release run、两个标签/index digest、源码/上游/版本/created、release.json       |
 | P6-R07  | 待 R06/独立客户端授权                    | public 匿名或 private 目标身份独立拉取，验证两平台临时运行                                                              | 实际 pull/运行、权限/平台/digest；长期非秘密发布记录                                |
@@ -779,10 +779,10 @@ shell PATH 未发现 Docker/Podman/独立 actionlint，不由此推断托管诊�
 | P6-C01  | 补充门禁负例待单独授权                   | 检查完全缺失、过期 main 等隔离场景，保留保护与原 PR，不合并负例                                                         | 真实 head/App/blocked 状态、清理和原保护不变证据                                    |
 | P6-S01  | 实现已在 main；真实写入未验              | 获准后检查真实官方 main 更新，执行同步 PR/CI/Issue/幂等与 workflow-file 权限演练                                        | 真正新上游双父 PR、分支/dispatch/check/head/App、失败通知与权限证据；no-op 不算正例 |
 | P6-S02  | 只读定时已配置未实证；写入 opt-in 未启用 | 只读 schedule 实际触发核查；写入仅在 S01 实证后另行决定                                                                 | 实际 schedule run/来源/结果与明确的启用授权，不由 YAML 推断                         |
-| P5-N01  | 手机兼容延期（唯一排期例外）                                 | 仅实际手机浏览器导航/触屏布局兼容延期；已知差异保留，不记通过；不阻塞本次正式版                           | SPEC 剩余场景的真实反馈/版本/平台与结果，不自动代签                                 |
-| P5-N02  | 非手机验收待完成 | 桌面中键/原生交互、完整键盘焦点/Widget统计、多标签页及适用OIDC/目标缓存；需设备/环境与运行授权 | 实际版本/配置/目标范围和结果；不从手机延期扩大豁免 |
-| P6-R10  | 最终多地址候选待冻结/复验 | PR #1按原路线合入main后核精确CI，再对正式发布run的同一OCI归档执行双架构及HTTP/安全门禁 | 源码含导航、main/版本/归档SHA/digest、同run完整验证；基础镜像不能代签 |
-| PR-N02  | PR #1 Draft/未合并                       | 先按原路线合#4并同步最新main到feature，完成非手机集成前验收/新CI；再单独授权Ready/merge#1，禁止直接合#1的更快路线                            | 审核记录、最新 CI、明确 Ready/merge 授权；保留 merge 历史                           |
+| P5-N01  | 手机兼容延期（唯一排期例外）             | 仅实际手机浏览器导航/触屏布局兼容延期；已知差异保留，不记通过；不阻塞本次正式版                                         | SPEC 剩余场景的真实反馈/版本/平台与结果，不自动代签                                 |
+| P5-N02  | 非手机验收待完成                         | 桌面中键/原生交互、完整键盘焦点/Widget统计、多标签页及适用OIDC/目标缓存；需设备/环境与运行授权                          | 实际版本/配置/目标范围和结果；不从手机延期扩大豁免                                  |
+| P6-R10  | 最终多地址候选待冻结/复验                | PR #1按原路线合入main后核精确CI，再对正式发布run的同一OCI归档执行双架构及HTTP/安全门禁                                  | 源码含导航、main/版本/归档SHA/digest、同run完整验证；基础镜像不能代签               |
+| PR-N02  | PR #1 Draft/未合并                       | 先按原路线合#4并同步最新main到feature，完成非手机集成前验收/新CI；再单独授权Ready/merge#1，禁止直接合#1的更快路线       | 审核记录、最新 CI、明确 Ready/merge 授权；保留 merge 历史                           |
 | OPS-L01 | 重复空索引锁根因未定位；上轮已安全清理   | 若复现先只读核实 inode/UID/mtime/Git 进程/lsof；不盲删活动锁、不重建索引                                                | 原因证据与逐次安全处置记录；本轮不为此改 Git 配置                                   |
 | DOC-D01 | 文档站实际构建未运行                     | 后续按需加入发布指南站点导航并运行 Zensical；不隐式安装工具                                                             | 文档站构建结果，不能由 Markdown 结构检查代签                                        |
 | OPT-G01 | 可选，未开始                             | 用户确需时再授权 Gitea 单向备份；不是当前阻塞                                                                           | 单向备份/恢复实证，无生产凭据进 Git                                                 |
@@ -801,20 +801,20 @@ shell PATH 未发现 Docker/Podman/独立 actionlint，不由此推断托管诊�
 
 ### 14.2 必须按证据推进的阶段
 
-| 阶段 | 后续工作 / 顺序 | 放行证据与禁止误判 |
-| --- | --- | --- |
-| F01 发布基础入main | 单独授权审查PR #4，Ready后以merge commit合入main；保留源分支，不动PR #1或保护设置 | 唯一已审head/10文件/父祖先；新main精确CI/App/全部步骤，不能用PR4旧绿替代 |
-| F02 基础真实构建 | F01后单独授权一次main fork-release.yml，publish=false、版本留空；失败先定位不自动rerun | 真实Docker/Buildx/QEMU/Skopeo双架构OCI、允许context与结构冒烟；不登录Hub，不称已有多地址镜像 |
-| F03 补足容器验证工具 | 当前fork-image-smoke只做Node/文件结构，需补可重复HTTP/认证/Host/配置挂载/PUID/健康验收，并纳入真实build job | 新脚本/回归测试/受审提交、新CI及云端真实结果；模拟工具调用不等于容器启动。任何新增发布基础须按可信main规则重新受审 |
-| F04 非手机P5 | 在获准临时环境补桌面中键/原生右键Shift/Ctrl-Cmd、完整Tab/Shift-Tab/方向键/Home-End/Escape/焦点恢复、Widget/统计区隔离、多标签页与降级 | 浏览器/OS/鼠标能力/viewport/配置代号与逐项结果；已有macOS8项和Chromium245项只覆盖已记录部分，无中键设备不自动算通过 |
-| F05 适用目标安全 | 核实本次实际使用密码或OIDC、canonical URL、Host、代理/CDN；按适用部署验匿名/错误密码/登录/退出、首页/API/Next数据、私有缓存与MISS→HIT正对照 | 真实目标及授权、认证和缓存证据；未使用OIDC/CDN须用户确认适用范围并记录理由，不能自行N/A；不关闭认证/Host来排障 |
-| F06 补齐既有验收 | C01门禁负例、S01真实上游PR/权限/CI/通知/幂等、S02实际调度等按13节逐项核实 | 缺真实上游更新、权限或调度证据时记录未完成/阻塞，no-op或模拟不能代签；本轮不自动豁免或启用写入定时，需另定范围时先问用户 |
-| F07 同步与审查导航 | 保留当前工作后将F01及其后最新main merge到feature，不rebase/force；逐项核二开、发布关键文件与指南冲突，完整安装/Lint/测试/构建 | 新feature祖先/差异、最新head CI/手工证据；PR1旧937绿色不能代签，不能直接合PR1绕开原顺序 |
-| F08 导航进入main | 非手机集成前门禁完成后，单独授权PR #1 Ready/保留历史merge；验main新head及完整CI，保留手机延期说明 | 实际main源码含模式/菜单/搜索/偏好，状态/父祖先/精确CI可追溯，不把基础PR4镜像当导航交付 |
-| F09 最终镜像再验证 | 对F08最终main的正式候选重做双架构构建、平台清单/标签/GPL/无秘密层和实际HTTP/安全/挂载检查 | 正式发布run中即将推送的**同一OCI归档**通过全部镜像门禁，记录source/main/upstream/version/created/archive SHA/index digest；早期基础或另一轮build-only的不同digest不能替代 |
-| F10 设置与回退准备 | 所有者建立目标Hub仓库、不可变规则、Git标签保护、main-only Environment/reviewer、最小权限Environment Secrets；隔离演练回退 | 脱敏保护读回/实际生效、版本兼容与旧可信digest可用；Token不进聊天/Git/镜像。首次没有旧正式版时用受控基础/原版镜像与候选做非生产回退，不虚构已验旧版 |
-| F11 正式推送 | 预发布门禁全部完成后，用户确认正式fork-vX.Y.Z版本和精确main源，单独授权opt-in/标签或main显式publish | 版本通知只是请求；验证主run、两个版本/SHA标签、同archive copy及digest读回。未知响应/部分成功先只读调查，不重试覆盖或删标签 |
-| F12 交付验收 | 实际推送后独立客户端匿名或目标身份拉取，检查两平台并临时运行；核旧digest仍可拉取、回退记录和源码许可 | Push成功不等于正式交付成功；完成pull/运行/回退与长期记录后才能宣布验收。不得自动重启NAS或生产容器 |
+| 阶段                 | 后续工作 / 顺序                                                                                                                             | 放行证据与禁止误判                                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F01 发布基础入main   | 单独授权审查PR #4，Ready后以merge commit合入main；保留源分支，不动PR #1或保护设置                                                           | 唯一已审head/10文件/父祖先；新main精确CI/App/全部步骤，不能用PR4旧绿替代                                                                                                  |
+| F02 基础真实构建     | F01后单独授权一次main fork-release.yml，publish=false、版本留空；失败先定位不自动rerun                                                      | 真实Docker/Buildx/QEMU/Skopeo双架构OCI、允许context与结构冒烟；不登录Hub，不称已有多地址镜像                                                                              |
+| F03 补足容器验证工具 | 最新本地已增加HTTP/原生密码/Host/配置挂载/PUID/健康工具并接入build job，见15节；受审进入可信main后仍须真实双架构实跑                        | 新脚本/回归测试/受审提交、新CI及云端真实结果；模拟工具调用不等于容器启动。任何新增发布基础须按可信main规则重新受审                                                        |
+| F04 非手机P5         | 在获准临时环境补桌面中键/原生右键Shift/Ctrl-Cmd、完整Tab/Shift-Tab/方向键/Home-End/Escape/焦点恢复、Widget/统计区隔离、多标签页与降级       | 浏览器/OS/鼠标能力/viewport/配置代号与逐项结果；已有macOS8项和Chromium245项只覆盖已记录部分，无中键设备不自动算通过                                                       |
+| F05 适用目标安全     | 核实本次实际使用密码或OIDC、canonical URL、Host、代理/CDN；按适用部署验匿名/错误密码/登录/退出、首页/API/Next数据、私有缓存与MISS→HIT正对照 | 真实目标及授权、认证和缓存证据；未使用OIDC/CDN须用户确认适用范围并记录理由，不能自行N/A；不关闭认证/Host来排障                                                            |
+| F06 补齐既有验收     | C01门禁负例、S01真实上游PR/权限/CI/通知/幂等、S02实际调度等按13节逐项核实                                                                   | 缺真实上游更新、权限或调度证据时记录未完成/阻塞，no-op或模拟不能代签；本轮不自动豁免或启用写入定时，需另定范围时先问用户                                                  |
+| F07 同步与审查导航   | 保留当前工作后将F01及其后最新main merge到feature，不rebase/force；逐项核二开、发布关键文件与指南冲突，完整安装/Lint/测试/构建               | 新feature祖先/差异、最新head CI/手工证据；PR1旧937绿色不能代签，不能直接合PR1绕开原顺序                                                                                   |
+| F08 导航进入main     | 非手机集成前门禁完成后，单独授权PR #1 Ready/保留历史merge；验main新head及完整CI，保留手机延期说明                                           | 实际main源码含模式/菜单/搜索/偏好，状态/父祖先/精确CI可追溯，不把基础PR4镜像当导航交付                                                                                    |
+| F09 最终镜像再验证   | 对F08最终main的正式候选重做双架构构建、平台清单/标签/GPL/无秘密层和实际HTTP/安全/挂载检查                                                   | 正式发布run中即将推送的**同一OCI归档**通过全部镜像门禁，记录source/main/upstream/version/created/archive SHA/index digest；早期基础或另一轮build-only的不同digest不能替代 |
+| F10 设置与回退准备   | 所有者建立目标Hub仓库、不可变规则、Git标签保护、main-only Environment/reviewer、最小权限Environment Secrets；隔离演练回退                   | 脱敏保护读回/实际生效、版本兼容与旧可信digest可用；Token不进聊天/Git/镜像。首次没有旧正式版时用受控基础/原版镜像与候选做非生产回退，不虚构已验旧版                        |
+| F11 正式推送         | 预发布门禁全部完成后，用户确认正式fork-vX.Y.Z版本和精确main源，单独授权opt-in/标签或main显式publish                                         | 版本通知只是请求；验证主run、两个版本/SHA标签、同archive copy及digest读回。未知响应/部分成功先只读调查，不重试覆盖或删标签                                                |
+| F12 交付验收         | 实际推送后独立客户端匿名或目标身份拉取，检查两平台并临时运行；核旧digest仍可拉取、回退记录和源码许可                                        | Push成功不等于正式交付成功；完成pull/运行/回退与长期记录后才能宣布验收。不得自动重启NAS或生产容器                                                                         |
 
 F03/F04/F05可在安全前提下并行准备，但F08前必须完成其适用的集成前验收；F09必须绑定最终源码和正式发布run的实际归档。工作流每次构建的version/created可能不同，不能把旧build-only归档视为后一次正式归档。新改动影响相关门禁时重做对应验证，不沿用旧head绿灯。
 
@@ -830,4 +830,40 @@ F03/F04/F05可在安全前提下并行准备，但F08前必须完成其适用的
 - 本次仅手机兼容有明确延期许可；不把它扩大成整个P5延期，也不降低安全门禁。手机验证以后恢复时保留既有问题与原始反馈，不用jsdom/模拟触屏代签。
 - SBOM/provenance/签名、进一步位级复现和原生ARM设备扩展仍属原已标明的后续增强；Gitea仍为可选单向备份，Skill暂不开发。未完成如实记录，不宣称已具备，也不自行把可选工作变成无限发布阻塞。
 - F11是有副作用的发布动作，F12含发布后交付验收；推送前完成所有可先做门禁，推送后只核实真实注册表结果。回退前先保护配置和日志，不强推main、不改旧标签、不关闭认证。
-- 当前下一步仍是**单独授权F01**，不是本轮直接操作。之后每次获准只执行所选范围；失败停止、报告，不自动扩大为部署或重复dispatch。
+- F03允许先做安全的本地准备；最新本地增量保存/推送和独立基础更新尚待明确授权，其后仍是**单独授权F01**。之后每次获准只执行所选范围；失败停止、报告，不自动扩大为部署或重复dispatch。
+
+## 15. F03 本地验证工具增量（未提交；不代表真实容器已通过）
+
+用户决定继续当前Pi/模型环境尽快开发；本地开发阶段未获Git/PR/Actions写入或发布授权，随后另行三项明确授权见15.4。起点feature/multi-address@8822dba60a34cf6179077117ac3fdd5dbce99f3a；原DEVELOPMENT表格格式化已保存preimage并保留。本轮不改业务/生产认证、依赖/锁文件、Dockerfile、CI必需检查定义/pin、main/保护/Secrets或手机合同。
+
+### 15.1 实现与隔离
+
+- 新增stdlib scripts/fork-image-http.mjs：固定loopback直接HTTP，无代理/自动跳转；Cookie与随机测试密码/Secret只在内存，通过Docker stdin提供合成运行环境，不写真实配置、argv或artifacts。每架构分别验证root+/app/config与10001:10002+/config，使用唯一标记的临时命名卷，不挂宿主生产目录或Docker socket；应用bridge、仅loopback发布端口，不宣称断网沙箱。
+- 原生CSRF/密码错误与成功、Session/退出、首页/服务/书签/Widget/Next数据私有缓存及暖读后的独立匿名隔离、Host失败和服务SSR/API一致性；健康来自实际Docker State.Health，PID1四项UID/GID来自/proc/1/status，卷原始文件/读写权限在HTTP前后验证。不会手工清空Cookie伪装退出成功，也不以docker exec自身UID冒充服务进程UID。
+- scripts/fork-image-smoke.mjs将上述检查置于每架构结构检查后，验证前后归档SHA一致；失败不上传，publisher继续只copy同一归档。新helper加入RELEASE_FILES；所有新工具须与可信main一致并受审，不能靠旧tag或环境跳过验证。临时容器/卷按唯一label和精确名称清理，含create响应不确定情况，不prune共享资源。
+- 新增40项发布/HTTP回归，其中真实loopback的合成HTTP服务只证明客户端/断言逻辑；模拟Docker/VM执行实际生成的检查代码以覆盖身份、挂载、退出、超时及清理，绝不称Docker验收。实际Homepage验证另见15.2。
+
+### 15.2 验证证据与失败处理
+
+证据统一在被Git/Docker忽略的config/p6-image-http/evidence；日志不含真实URL/密码/Cookie/Token。
+
+- 改动前默认完整测试587文件/2416项通过（baseline-focused.log，命令中多余的`--`未过滤文件，按真实全量结果记录）。frozen/offline安装成功、锁文件未改；全量Lint及隔离虚构配置生产构建通过，最终日志以本目录记录为准。
+- 新代码工作流227项；最终默认完整测试588文件/2456项通过，见feature-test-route-setup.log。没有改测试超时/并发或省略原测试；两条既有嵌套vi.unmock警告仍保留。独立发布基础（578文件）同版本测试为2129项通过，见foundation-test-route-setup.log。
+- 原生新生产构建standalone实际执行103项HTTP检查：匿名/错误密码/登录/退出、Host、私有缓存、SSR/API/Next数据。随机loopback端口与虚构配置，结束停止精确子进程并删除临时配置；见native-http-recheck.log。未恢复旧P5人工实例、未启动对外部署，不能代签Docker/QEMU、OIDC、HTTPS/CDN或物理浏览器。
+- 初次native检查失败SMOKE_UNSAFE_AUTH_REDIRECT：真实Next数据307使用x-nextjs-redirect而非Location，已补协议支持；两个头若同时存在均需同源登录目标，并新增恶意/冲突Next重定向负例，不放宽应用认证或Host。保留native-http.log/debug.log。
+- 原全量回归test.log/test-final.log出现既有auth-boundary动态import超原5000ms。未改8822的Git对象隔离副本也复现同一失败（baseline-isolated-full.log），定向原58项通过。先把模块图准备移出请求断言，但在独立基础首次验证时发现“单个beforeAll并行加载全部路由”又超过默认10秒hook，28项被skip且测试整体失败（foundation-test.log）；该失败未被当成通过。最终改为每路由独立describe嵌套block，仅将自身真实handler的import放进该block的beforeAll，保持认证环境、原路由筛选、全部401/CSS/Host断言、默认hook/test超时和默认并发。功能与独立基础完整回归分别通过；不是删除认证测试、mock掉真实handler、吞failure或调大超时。
+- 首次install/Lint/测试串行命令在300秒预算内停于Lint，后续测试当时未启动；保留lint.log和超时记录，不算通过。单独全量Lint随后成功，lint-recheck.log。文档站实际构建仍未运行；诊断不能由空缓存代签。
+
+### 15.3 尚未完成与下一授权
+
+- 本机没有Docker/Podman/Skopeo，所有真正Docker/QEMU/OCI、两平台挂载/权限和Hub结果仍未运行。原PR #4/head89f0a542不包含本轮F03增量，旧真实CI不能代签；本轮没有提交、推送、改PR/设置或dispatch。
+- 只读ls-remote新核远程main=57acb02c、feature=8822dba6、发布基础=89f0a542；本地main引用实际仍为初始2e5f1013，origin/main缓存为57acb02c，未自动移动或checkout。后续集成以实时远程main为准，不把本地旧main当最新基线。
+- 最终主动诊断11条路径：7 confirmed clean、4 inconclusive，不称全部clean；固定loopback canonical的硬编码URL建议已明确标为false-positive，不能为消警改成可任意外发凭据的环境URL。Node语法、Prettier、Markdown链接与diff检查结果另见本目录verification.json，文档站构建仍未运行。
+- 本地F03增量与两项测试修复已完成；三项写入授权见15.4。下一步按顺序受限执行：提交/推送feature、将同一发布payload+测试/文档增量独立提交到发布分支并核PR #4精确新CI，范围/CI通过后方可Ready/merge，再核main CI，最后单次publish=false。任一步失败停止并报告，不自行扩大授权。
+- 仅手机兼容继续延期。F04～F12、上游真实写入/实际调度、适用目标安全、Hub保护和独立拉取/回退继续逐项待办；不因本轮工具与native通过而宣布正式镜像交付。
+
+### 15.4 本地验证后另获的三项明确授权
+
+用户通过三个独立选项依次确认：(1)提交/非force推送本轮feature代码与文档，将发布增量独立更新PR #4并核新CI，保留Draft，不引入导航源码或feature祖先；(2)仅在新head完整CI及范围审查通过后，PR #4 Ready并以merge commit合main、保留源分支、核新main精确CI；(3)其后只dispatch一次main fork-release.yml、publish=false、version_tag空值，验证同一OCI归档两架构/容器，失败停止、不自动rerun。
+
+此授权不涵盖PR #1 Ready/merge、保护/仓库设置、Secrets/发布opt-in、版本标签、Hub登录/推送或任何生产部署。若条件或源码改变、响应未知先只读核实，不盲重复写入。本轮精确提交、PR/check/App/父树与实际run分别保存config/p6-image-http/evidence；不能把获得授权记成已经成功执行。
