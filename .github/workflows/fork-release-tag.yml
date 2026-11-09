@@ -1,0 +1,41 @@
+name: Fork version tag notification
+
+on:
+  push:
+    tags: ["fork-v*"]
+
+permissions: {}
+
+concurrency:
+  group: fork-release-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    if: github.repository == 'kanon-H/homepage' && github.event_name == 'push' && github.ref_type == 'tag' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      # No checkout, registry secrets, login or candidate code execution.
+      - name: Request the trusted main release controller once
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        with:
+          retries: 0
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            if (context.repo.owner !== 'kanon-H' || context.repo.repo !== 'homepage' ||
+                !/^fork-v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag) || tag.length > 64) {
+              throw new Error('Not an authorized Fork release tag');
+            }
+            // A 204 means request accepted, NOT image publication success.
+            // Unknown responses stop; inspect main workflow runs instead of blindly dispatching again.
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'kanon-H', repo: 'homepage', workflow_id: 'fork-release.yml', ref: 'main',
+              inputs: {version_tag: tag, publish: true}
+            });
+            core.notice('Main release request accepted; verify the separate release run and registry digest.');
