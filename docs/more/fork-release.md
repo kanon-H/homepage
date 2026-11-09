@@ -25,7 +25,11 @@
 
 全部 job 的 GITHUB_TOKEN 默认仅 contents:read；plan/publisher 另有 actions:read，只读核验 Environment 保护，只有无注册表凭据的 tag 通知 job 获得 actions:write。没有 packages:write、生产部署或自动合并权限。内置 token 生成的普通 push/tag 事件不保证触发另一个 workflow；未来若由机器人创建版本标签，应显式调用可信 main 控制器，不能假设普通触发有效。
 
-### 1.1a 首次真实 build-only 结果（失败，已停止）
+### 1.1b 第二次 build-only（仍失败，已定位真正根因）
+
+PR #5（`bc7ec5ad`）合入后 main 为 `d67ebbb1`，头尾 CI 均通过，但单次 dispatch run `42615682764` 仍在同一处失败。根因不是 context 选择，而是 **`Dockerfile.fork.dockerignore` 的 deny-by-default**：`**` 排除全部，未显式 `!tailwind.config.js`，因此文件虽在 context 中，Docker 构建时仍被过滤。
+
+修复：`.dockerignore` 增加 `!tailwind.config.js`；测试锁住“deny-by-default 必须显式放行构建所需根文件”“放行项必须真实存在”“`globals.css` 的 `@config` 目标必须已放行”。本地 2458 测试与 Lint 通过，并用 ignore 语义模拟确认必需文件全部进入、无私有/构建产物泄漏。**仍未在真实容器内验证**；重验需另行授权。
 
 main `0d4cfc1d` 上单次 dispatch（`publish=false`、版本空）run `42608235225` attempt1 在 build job 失败：容器内 `next build` 报 `Can't resolve '../../tailwind.config.js'`。白名单 context 漏了 `tailwind.config.js`，而 `src/styles/globals.css` 用 `@config '../../tailwind.config.js'` 引用它。未 rerun、未重新 dispatch、未登录 Docker Hub、未推送镜像，publish job 被跳过。
 
