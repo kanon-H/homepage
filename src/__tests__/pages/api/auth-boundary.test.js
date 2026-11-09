@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import createMockRes from "test-utils/create-mock-res";
 
@@ -11,15 +11,27 @@ const routes = allRoutes.filter(([file]) => !/\/(auth|mcp)\//.test(file) && !fil
 describe("API authentication without middleware", () => {
   beforeEach(() => vi.stubEnv("HOMEPAGE_AUTH_ENABLED", "true"));
   afterEach(() => vi.unstubAllEnvs());
+  afterAll(() => vi.unstubAllEnvs());
 
-  it.each(routes)("rejects anonymous access to %s at its exported handler", async (_file, load) => {
-    const { default: handler } = await load();
-    const req = { query: {}, headers: { "x-prerender-revalidate": "public-image-key" }, cookies: {} };
-    const res = createMockRes();
-    await handler(req, res);
-    expect(res.statusCode).toBe(401);
-    expect(res.body).toEqual({ error: "Unauthorized" });
-    expect(res.headers["Cache-Control"]).toBe("private, no-store");
+  // Keep each real route's module preparation separate from its request assertion.
+  // Do not put the entire cold module graph into one bounded setup hook. Each
+  // import still runs with auth enabled and must pass the unchanged hook timeout.
+  describe.each(routes)("%s", (_file, load) => {
+    let handler;
+    beforeAll(async () => {
+      vi.stubEnv("HOMEPAGE_AUTH_ENABLED", "true");
+      ({ default: handler } = await load());
+    });
+    afterAll(() => vi.unstubAllEnvs());
+
+    it("rejects anonymous access at its exported handler", async () => {
+      const req = { query: {}, headers: { "x-prerender-revalidate": "public-image-key" }, cookies: {} };
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.statusCode).toBe(401);
+      expect(res.body).toEqual({ error: "Unauthorized" });
+      expect(res.headers["Cache-Control"]).toBe("private, no-store");
+    });
   });
 
   it("keeps sign-in CSS public while protecting custom JavaScript", async () => {

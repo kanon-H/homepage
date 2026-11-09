@@ -1,0 +1,29 @@
+# Deny by default, including ignored operator configs, .git and host build products.
+**
+!Dockerfile.fork
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!next.config.js
+!next-i18next.config.js
+!jsconfig.json
+!postcss.config.js
+!docker-entrypoint.sh
+!LICENSE
+!src/
+!src/**
+!public/
+!public/**
+!scripts/
+!scripts/fork-ci-build.sh
+# These exclusions win even inside otherwise allowed directories.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/.git
+**/node_modules
+**/*.test.js
+**/*.test.jsx
+src/__tests__/
+src/test-utils/
