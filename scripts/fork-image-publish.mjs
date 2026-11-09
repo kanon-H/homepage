@@ -50,11 +50,25 @@ export async function fileDigest(path) {
 
 export function inspectArchive(archive, plan, tool = runTool) {
   const raw = tool("skopeo", ["inspect", "--raw", `oci-archive:${archive}`]);
-  const index = parseMetadata(raw);
-  requireRelease(Array.isArray(index.manifests) && index.manifests.length === 2, "EXPECTED_TWO_PLATFORMS");
+  let index = parseMetadata(raw);
+  // buildx may wrap the platform list in an extra annotations-only index.
+  if (Array.isArray(index.manifests) && index.manifests.length === 1 && !index.manifests[0].platform) {
+    const inner = index.manifests[0].digest;
+    requireRelease(/^sha256:[0-9a-f]{64}$/.test(inner || ""), "EXPECTED_TWO_PLATFORMS");
+    index = parseMetadata(tool("tar", ["-xOf", archive, `blobs/sha256/${inner.slice(7)}`]));
+  }
+  requireRelease(Array.isArray(index.manifests), "EXPECTED_TWO_PLATFORMS");
+  // Attestation/provenance manifests carry platform unknown/unknown. They are not
+  // runnable images, so select real linux/amd64 and linux/arm64 manifests explicitly
+  // instead of demanding that the archive contain exactly two entries.
+  const platforms = index.manifests.filter((m) => m.platform?.os === "linux" && m.platform?.architecture);
   requireRelease(
-    index.manifests.every((m) => m.platform?.os === "linux") &&
-      ["amd64", "arm64"].every((arch) => index.manifests.some((m) => m.platform?.architecture === arch)),
+    platforms.length === 2 &&
+      ["amd64", "arm64"].every((arch) => platforms.some((m) => m.platform.architecture === arch)),
+    "WRONG_IMAGE_PLATFORMS",
+  );
+  requireRelease(
+    index.manifests.every((m) => !m.platform || m.platform.os === "linux" || m.platform.os === "unknown"),
     "WRONG_IMAGE_PLATFORMS",
   );
   for (const arch of ["amd64", "arm64"]) {

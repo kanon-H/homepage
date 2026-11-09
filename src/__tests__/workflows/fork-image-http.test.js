@@ -118,19 +118,21 @@ function dockerFixture(fault) {
       return volume;
     }
     if (args[0] === "run") {
-      files = JSON.parse(options.input);
+      // Two run steps now exist: the root chown pass and the identity-matched seed.
+      // Only the seed carries fixture files on stdin.
+      if (options.input !== undefined) files = JSON.parse(options.input);
       return "";
     }
     if (args[0] === "create") {
       name = args[args.indexOf("--name") + 1];
       mount = args[args.indexOf("--mount") + 1].split("target=")[1];
+      // Env values now arrive as repeated "--env KEY=value" pairs, not stdin.
       environment = Object.fromEntries(
-        options.input
-          .trim()
-          .split("\n")
-          .map((line) => {
-            const i = line.indexOf("=");
-            return [line.slice(0, i), line.slice(i + 1)];
+        args
+          .filter((_value, index) => args[index - 1] === "--env")
+          .map((pair) => {
+            const i = pair.indexOf("=");
+            return [pair.slice(0, i), pair.slice(i + 1)];
           }),
       );
       resources.containers.add(name);
@@ -264,14 +266,16 @@ describe("Docker application orchestration (mock Docker, not image acceptance)",
       expect(deps.resources.containers.size + deps.resources.volumes.size).toBe(0);
       const creates = deps.tool.mock.calls.filter(([args]) => args[0] === "create");
       expect(creates).toHaveLength(2);
-      for (const [args, { input }] of creates) {
-        expect(args).toContain("--env-file=/dev/stdin");
+      for (const [args, options] of creates) {
+        // /dev/stdin is not reopenable when stdin is a pipe, so env values are inline.
+        expect(args).not.toContain("--env-file=/dev/stdin");
+        expect(options?.input).toBeUndefined();
+        const envValues = args.filter((_value, index) => args[index - 1] === "--env");
+        expect(envValues).toContain("HOMEPAGE_AUTH_ENABLED=true");
+        expect(envValues.some((value) => value.startsWith("HOMEPAGE_AUTH_PASSWORD="))).toBe(true);
         expect(args).toContain("127.0.0.1::3000");
         expect(args).not.toEqual(expect.arrayContaining(["--privileged", "--network=host", "--restart=always"]));
-        const syntheticPassword = input.match(/HOMEPAGE_AUTH_PASSWORD=([^\n]+)/)[1];
-        expect(JSON.stringify(args)).not.toContain(syntheticPassword);
-        expect(input).toContain("HOMEPAGE_AUTH_ENABLED=true\n");
-        expect(input).not.toMatch(/DOCKERHUB_|GITHUB_TOKEN|NEXTAUTH_SECRET/);
+        expect(envValues.join("\n")).not.toMatch(/DOCKERHUB_|GITHUB_TOKEN|NEXTAUTH_SECRET/);
       }
       expect(deps.tool.mock.calls.filter(([args]) => args[0] === "exec")).toHaveLength(4);
     },
@@ -301,6 +305,48 @@ describe("Docker application orchestration (mock Docker, not image acceptance)",
     await expect(verifyApplication("fixture-image", "amd64", deps)).rejects.toThrow("HTTP_FAILED");
     expect(deps.probe).toHaveBeenCalledTimes(1);
     expect(deps.resources.containers.size + deps.resources.volumes.size).toBe(0);
+  });
+  it("pre-owns the volume for PUID and seeds as that identity, never as root", async () => {
+    const deps = dockerFixture();
+    await verifyApplication("fixture-image", "amd64", deps);
+    const runs = deps.tool.mock.calls.filter(([args]) => args[0] === "run");
+    // One chown pass plus one seed per mount mode.
+    expect(runs).toHaveLength(4);
+    for (let index = 0; index < runs.length; index += 2) {
+      const [chownArgs] = runs[index];
+      const [seedArgs, seedOptions] = runs[index + 1];
+      expect(chownArgs[chownArgs.indexOf("--user") + 1]).toBe("0:0");
+      expect(chownArgs).toContain("--cap-add=CHOWN");
+      expect(chownArgs.join(" ")).toMatch(/chown \d+:\d+ \/fixture/);
+      const identity = seedArgs[seedArgs.indexOf("--user") + 1];
+      expect(identity).toMatch(/^(0:0|10001:10002)$/);
+      expect(chownArgs.join(" ")).toContain(`chown ${identity} /fixture`);
+      expect(seedOptions.input).toBeTypeOf("string");
+    }
+  });
+  it("never lets a cleanup failure hide the gate that actually failed", async () => {
+    // Real incident: `docker create --env-file=/dev/stdin` failed, but `finally`
+    // cleanup also failed (no docker CLI in PATH) and replaced the real error, so
+    // four CI runs only ever showed a cleanup code.
+    const deps = dockerFixture();
+    deps.probe.mockRejectedValue(new Error("REAL_GATE_FAILURE"));
+    const cleanupBroken = vi.fn((args, options) => {
+      if (args[0] === "container" && args[1] === "ls") throw new Error("docker ENOENT");
+      return deps.tool(args, options);
+    });
+    await expect(verifyApplication("fixture-image", "amd64", { ...deps, tool: cleanupBroken })).rejects.toThrow(
+      /REAL_GATE_FAILURE.*cleanup also failed|REAL_GATE_FAILURE/,
+    );
+  });
+  it("still surfaces a cleanup failure when the gate itself passed", async () => {
+    const deps = dockerFixture();
+    const cleanupBroken = vi.fn((args, options) => {
+      if (args[0] === "container" && args[1] === "ls") throw new Error("CLEANUP_ONLY_FAILURE");
+      return deps.tool(args, options);
+    });
+    await expect(verifyApplication("fixture-image", "amd64", { ...deps, tool: cleanupBroken })).rejects.toThrow(
+      /CLEANUP/,
+    );
   });
   it("never deletes an unexpectedly named resource even if it matches the label", async () => {
     const deps = dockerFixture("foreign");

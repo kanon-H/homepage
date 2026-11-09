@@ -25,7 +25,42 @@
 - GitHub Actions 测试并发布 Docker Hub 镜像；Gitea 单向备份仍可选。
 - 最新发布目标是正式多地址镜像：仅P5手机兼容验收延期，其余必需工作完成后发布；不采用预览/直接合PR #1的更快路线，不开发Skill。手机已知差异保留为延期未完成，见SPEC12.1及DEVELOPMENT14。
 
-## 当前状态：第二次真实 build-only 仍失败；已定位为 `.dockerignore` 未放行 `tailwind.config.js`
+## 当前状态：容器门禁 6 个真实缺陷已修复，并在 fnos-max 真实双架构上端到端通过
+
+main 现为 `a76bf47288d41324ae53821191fb8843f7e4f74b`（PR #7 merge）。四次 `publish=false` 实跑全部失败，但现已定位：**镜像构建本身在第 3 轮已成功**，后续失败全部来自发布门禁自身的缺陷，不是产品回归。
+
+借助用户提供的局域网 Docker 服务器（`fnos-max`，Docker 28.5.2，普通用户 kanon + docker 组），用真实镜像真实容器复现，取得确切错误：
+
+| ID  | 缺陷                                                              | 真实错误                                                  | 状态                                        |
+| --- | ----------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------- |
+| G1  | `docker create --env-file=/dev/stdin` 在 stdin 为 pipe 时不可打开 | `docker: open /dev/stdin: no such device or address`(125) | 已修：改内联 `--env`                        |
+| G2  | `finally` 中 cleanup 抛错覆盖真实门禁错误                         | 四次只见 `SMOKE_*_CLEANUP_FAILED`                         | 已修：保存原错、重抛并附 stage              |
+| G3  | `verificationFailureCode` 把带冒号诊断压成通用码                  | 只见 `IMAGE_VERIFICATION_FAILED`                          | 已修：保留已脱敏细节                        |
+| G4  | 非 root 模式先 seed root 卷再要求 PUID 写入                       | `EACCES binding.writeFileUtf8`                            | 已修：先 chown 到 PUID:PGID 再以该身份 seed |
+| G5  | buildx 归档外层 index 包一层嵌套 index                            | `EXPECTED_TWO_PLATFORMS`                                  | 已修：从 blob store 读内层 index            |
+| G6  | 归档含 unknown/unknown provenance manifest                        | 同上，硬编码“恰好 2 个”必失败                             | 已修：按平台筛选，忽略 attestation          |
+
+**真实端到端证据**（双架构 OCI 归档，161MB）：
+
+```text
+linux/amd64  /app/config  uid=0      103 checks  healthy
+linux/amd64  /config      uid=10001  103 checks  healthy
+linux/arm64  /app/config  uid=0      103 checks  healthy
+linux/arm64  /config      uid=10001  103 checks  healthy
+Both platform runtime structures and application HTTP/password/Host/mount/identity/health gates verified
+```
+
+本地 588 文件 / 2463 测试、Lint 通过。服务器只创建了带唯一 `io.homepage.fork.smoke` 标签的临时容器/卷并全部按名清理，删除自建 builder 与调试镜像；**生产 76 个容器前后数量一致，未被触碰**。服务器证据仅用于调试，正式交付仍须 GitHub Actions 在同一归档上实跑（SPEC 12.1）。
+
+四个失败 run（`42608235225`/`42615682764`/`42622961033`/`42631136692`）按用户要求保留不动，不 rerun。
+
+### P6 第十六小步：真实容器门禁缺陷定位与修复（最新）
+
+- 关键教训：`finally` 里做清理会静默吞掉真实失败；跨层校验必须同时覆盖 context、`.dockerignore`、归档 index 形状与可选 attestation。
+- 证据目录 `config/p6-image-http/evidence/`：`root-cause-final.json`、`failure-chain-analysis.json`、`release{2,3,4}-build-log.txt`、`g4-*`、`attest-*`、`final-*`。
+- 下一步：按本轮授权推送→PR #8→核 head CI→merge→核 main CI→单次 `publish=false`。失败即停并报告。
+
+### P6 第十五小步：第二轮 build-only 失败与根因（历史）
 
 第二轮修复 PR #5 已合入 main：`d67ebbb1ca96b2c70b53eab3c42b5e9de2040a55`（双父 `0d4cfc1d`+`bc7ec5ad`，源分支保留，保护未变），PR #5 head `bc7ec5ad` CI run `42613308828` 与 main CI run `42614710657` 均 attempt1 全步骤成功。
 
