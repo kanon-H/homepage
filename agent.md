@@ -25,7 +25,21 @@
 - GitHub Actions 测试并发布 Docker Hub 镜像；Gitea 单向备份仍可选。
 - 最新发布目标是正式多地址镜像：仅P5手机兼容验收延期，其余必需工作完成后发布；不采用预览/直接合PR #1的更快路线，不开发Skill。手机已知差异保留为延期未完成，见SPEC12.1及DEVELOPMENT14。
 
-## 当前状态：F03 镜像 HTTP 验证工具已本地实现；真实双架构实跑仍待授权
+## 当前状态：PR #4 已入 main；首次真实 build-only 失败已定位并本地修复，待授权重验
+
+main 现为 `0d4cfc1dfc77c8654cb9cb010d768790d0d1d166`（PR #4 merge commit，双父 `57acb02c`+`adbe0132`，树与受审 head 一致，源分支保留，PR #1 未动）。新 main 精确 CI run `42606899680` attempt1 全步骤成功。feature 已推送 `d4362f1c`（2456 测试），PR #4 head `adbe0132` 的 CI run `42605650425` attempt1 成功。
+
+随后按授权单次 dispatch `fork-release.yml`（`publish=false`、版本留空），run `42608235225` **attempt1 失败并已停止**：`Build both architectures without registry credentials` 在容器内 `next build` 报 `Can't resolve '../../tailwind.config.js'`。根因是白名单 Git context 漏了 `tailwind.config.js`，而 `src/styles/globals.css` 通过 `@config` 引用它。**未 rerun、未再次 dispatch、未登录 Docker Hub、未推送镜像、publish job 被跳过**；失败日志见 `config/p6-image-http/evidence/release-build-log.txt` 与 `release-failure-analysis.json`。
+
+本地修复仅两个文件：`scripts/fork-image-context.mjs` 把 `tailwind.config.js` 加入白名单根文件，`src/__tests__/workflows/fork-release.test.js` 增加“该配置与 globals.css 一起导出”的回归。当前 context 669 个文件、无 `config/`，**2457 测试/Lint/隔离构建通过**。修复尚未提交推送；`fork-image-context.mjs` 不在上轮授权范围内，main 也已前进，需另行授权才能推送、开后续 PR、合并并再单次 dispatch。
+
+### P6 第十四小步：PR #4 入 main 与首次真实 build-only 失败（最新）
+
+- 授权链本地证据：`config/p6-image-http/evidence/` 下 `authorized-before.json`、`feature-push.log`、`foundation-push.log`、`foundation-ci-verification.json`、`merge-before.json`、`merge-verification.json`、`main-ci-verification.json`、`release-preconditions.json`、`release-dispatch-response.json`、`release-run-summary.json`、`release-failure-analysis.json`。
+- 8 个发布文件在两分支逐字节一致；基础分支 13 文件（PR #4 原 10 + F03 3），无导航源码、无 feature 祖先，范围门禁曾拦下我最初漏算的 3 个原基础文件，已按实际 13 文件重新核对后合并。
+- 索引锁两次复现：首次核对空文件/当前 UID/无 Git 进程/无 lsof/两次状态一致后清理并未重建索引，证据 `stale-index-lock-before.json`、`stale-lock-2.json`；**根因仍未定位**（OPS-L01 保持未完成）。
+- 失败属“我的 context 白名单遗漏”，不是不可解或产品缺陷；但本地隔离构建能过、镜像内构建不过，说明该白名单必须有独立回归。已新增。
+- 下一步需明确授权：推送该修复 → 开后续 PR 到 main → 核新 head CI → merge → 核新 main CI → **再次单次** `publish=false` 实跑。不得自动 rerun 旧失败 run、不得跳过容器门禁、不得提前 publish=true。
 
 从feature/multi-address@8822dba60a34cf6179077117ac3fdd5dbce99f3a继续本地开发，保留原DEVELOPMENT表格格式化。旧head的真实CI run42577634798/check129028827539已通过，但不能代签本轮尚未提交的改动。本地开发阶段未写远程；随后用户已分别授权保存/独立PR #4更新、受审CI通过后Ready/merge #4及main CI、一次publish=false/空版本双架构实跑。操作按条件推进、失败停止，精确结果以Git/GitHub及本轮evidence为准；不动PR #1/保护/Secrets/Hub发布或生产。独立发布基础仍须经受审集成和精确CI后才能实跑。只有手机兼容延期，正式路线不变。
 

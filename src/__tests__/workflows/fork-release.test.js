@@ -103,6 +103,7 @@ function repository() {
     "next-i18next.config.js",
     "jsconfig.json",
     "postcss.config.js",
+    "tailwind.config.js",
     "docker-entrypoint.sh",
     "LICENSE",
   ])
@@ -319,6 +320,18 @@ describe("committed image context, not operator working tree", () => {
     "src/__tests__/x.js",
     "src/../config/x",
   ])("excludes %s", (path) => expect(allowedContextPath(path)).toBe(false));
+  it("includes the Tailwind config referenced by src/styles/globals.css", () => {
+    expect(allowedContextPath("tailwind.config.js")).toBe(true);
+    const r = repository();
+    put(r.directory, "src/styles/globals.css", "@config '../../tailwind.config.js';\n");
+    put(r.directory, "tailwind.config.js", "module.exports = {};\n");
+    git(r.directory, "add", ".");
+    git(r.directory, "commit", "-m", "style fixture");
+    const head = git(r.directory, "rev-parse", "HEAD");
+    const paths = createImageContext(r.directory, head, join(r.directory, "style-output"));
+    expect(paths).toContain("tailwind.config.js");
+    expect(paths).toContain("src/styles/globals.css");
+  });
   it("exports only allowed committed bytes, preserves binary data and ignores dirty private files", () => {
     const r = repository();
     put(r.directory, "config/services.yaml", "PRIVATE");

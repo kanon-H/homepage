@@ -16,6 +16,7 @@ const rootFiles = new Set([
   "next-i18next.config.js",
   "jsconfig.json",
   "postcss.config.js",
+  "tailwind.config.js",
   "docker-entrypoint.sh",
   "LICENSE",
 ]);
