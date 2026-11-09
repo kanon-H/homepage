@@ -199,6 +199,26 @@ describe("Fork release workflow boundaries", () => {
     const ignore = readFileSync(join(root, "Dockerfile.fork.dockerignore"), "utf8");
     expect(ignore).toContain("\n**\n");
     expect(ignore).not.toContain("!.next");
+    // Deny-by-default means every file the build really reads needs an explicit
+    // re-include; the context allowlist alone does not make it into the image build.
+    for (const file of ["package.json", "pnpm-lock.yaml", "postcss.config.js", "tailwind.config.js", "LICENSE"]) {
+      expect(ignore).toContain(`!${file}\n`);
+    }
+  });
+  it("keeps the Docker ignore re-includes aligned with files the app build reads", () => {
+    const ignore = readFileSync(join(root, "Dockerfile.fork.dockerignore"), "utf8").split("\n");
+    const included = ignore.filter((line) => line.startsWith("!") && !line.includes("*"));
+    for (const file of included.map((line) => line.slice(1))) {
+      if (file.endsWith("/")) continue;
+      expect(existsSync(join(root, file)), `${file} is re-included but missing`).toBe(true);
+    }
+    // src/styles/globals.css resolves @config '../../tailwind.config.js'.
+    const globals = readFileSync(join(root, "src/styles/globals.css"), "utf8");
+    const configured = globals.match(/@config\s+['"]([^'"]+)['"]/);
+    if (configured) {
+      const resolved = configured[1].replace(/^\.\.\/\.\.\//, "");
+      expect(ignore).toContain(`!${resolved}`);
+    }
   });
 });
 
