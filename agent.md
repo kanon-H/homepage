@@ -25,7 +25,20 @@
 - GitHub Actions 测试并发布 Docker Hub 镜像；Gitea 单向备份仍可选。
 - 最新发布目标是正式多地址镜像：仅P5手机兼容验收延期，其余必需工作完成后发布；不采用预览/直接合PR #1的更快路线，不开发Skill。手机已知差异保留为延期未完成，见SPEC12.1及DEVELOPMENT14。
 
-## 当前状态：PR #4 已入 main；首次真实 build-only 失败已定位并本地修复，待授权重验
+## 当前状态：第二次真实 build-only 仍失败；已定位为 `.dockerignore` 未放行 `tailwind.config.js`
+
+第二轮修复 PR #5 已合入 main：`d67ebbb1ca96b2c70b53eab3c42b5e9de2040a55`（双父 `0d4cfc1d`+`bc7ec5ad`，源分支保留，保护未变），PR #5 head `bc7ec5ad` CI run `42613308828` 与 main CI run `42614710657` 均 attempt1 全步骤成功。
+
+但在 main `d67ebbb1` 上单次 `publish=false` 实跑 run `42615682764` **再次失败于同一点**：`Can't resolve '../../tailwind.config.js'`。真正根因是 **`Dockerfile.fork.dockerignore` 以 `**` 拒绝一切、未显式 `!tailwind.config.js`**；上一轮只修了 context 白名单，文件进了 context 却在 Docker 构建时被 ignore 掉。**未 rerun、未再次 dispatch、未登录 Hub、未推送镜像**；publish job 仍被跳过。日志：`release2-build-log.txt`。
+
+本地修复两文件：`.dockerignore` 增加 `!tailwind.config.js`；测试新增“deny-by-default 必须显式放行构建所需根文件”“放行项必须真实存在”“`globals.css` 的 `@config` 目标必须在 ignore 中放行”三类断言。**2458 测试 / Lint 通过**，并用 Docker ignore 语义模拟确认 12 个必需文件全部 included、无 `config/`、`.next/`、`node_modules`、`.env`、私钥或测试文件泄漏。尚未提交推送；需新授权才能继续。
+
+### P6 第十五小步：第二次 build-only 失败与 dockerignore 根因（最新）
+
+- 教训：镜像能否构建由 **两层**决定——Git context 白名单与 `.dockerignore` 放行；只改一层会得到“context 有文件、镜像里没有”的假修复。已用回归同时锁住两层。
+- 本轮运维证据：`fix-pr-create.log`、`fix-ci-verification.json`、`merge-verification.json`、`main2-ci-verification.json`、`release2-preconditions.json`、`release2-dispatch-response.json`、`release2-run-summary.json`、`release2-build-log.txt`、`dockerignore-sim.log`。
+- 索引锁第三次复现（空/当前 UID/无进程/无 lsof/两次一致），已清理且未重建索引：`stale-lock-3.json`；根因仍未定位。
+- 下一步仍需明确授权：推送该修复 → 后续 PR → 核 head CI → merge → 核 main CI → **再次单次** `publish=false`。不自动 rerun 两个失败 run，不进入 publish=true。
 
 main 现为 `0d4cfc1dfc77c8654cb9cb010d768790d0d1d166`（PR #4 merge commit，双父 `57acb02c`+`adbe0132`，树与受审 head 一致，源分支保留，PR #1 未动）。新 main 精确 CI run `42606899680` attempt1 全步骤成功。feature 已推送 `d4362f1c`（2456 测试），PR #4 head `adbe0132` 的 CI run `42605650425` attempt1 成功。
 
