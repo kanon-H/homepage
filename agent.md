@@ -22,13 +22,29 @@
 - 认证完全复用现有密码门禁/OIDC，个人场景不需要用户系统。
 - 配置继续用 YAML；偏好保存在浏览器，当前没有数据库。
 - 如果未来确需数据库，优先 SQLite，并另行设计/确认，不能现在提前引入。
-- GitHub Actions 测试和构建 GHCR 镜像；Gitea 单向备份可后续做。
+- GitHub Actions 测试并发布 Docker Hub 镜像（用户本轮选择，替代原 GHCR 优先计划）；Gitea 单向备份可后续做。
 
-## 当前状态：功能分支已同步 main 且本地验证通过；写入同步仍未实跑
+## 当前状态：独立发布基础 Draft PR #4 的真实 CI 通过；未合入 main 或实跑镜像
 
-远程 main/origin/main 保留 `57acb02c54660114de4aeadd2473c16e90454f4c`。本轮用户结构化授权将其 merge 到功能分支、更新必要交接、验证后非 force 推送并核查新 CI。纯合并提交为 `d34ccc1b62b1dd2d98646309fc2d0683b7bfea16`，本地已包含 main 的全部祖先；最终推送 head/CI 以 Git、GitHub 和忽略目录中的本轮证据为准，不以旧绿色代签。PR #1 仍须保持 Draft/未合并，基础源分支 c64db269 保留。不改 main/保护或 PR 状态，不运行写入同步、定时 opt-in、发布部署或恢复 P5。
+发布基础已独立提交/推送为 89f0a54238fee80cdf843bde416459e9f1b3c8da，并创建 [Draft PR #4](https://github.com/kanon-H/homepage/pull/4)，main 保留 57acb02c，导航 PR #1 保持 Draft/未合并。本轮用户结构化授权独立分支验证后提交/非 force 推送/建 Draft PR，另将原 feature 的13项本地变更（含文档自动格式化）一并提交/推送并核新 CI。原 feature 本次保存前为 c89b6a93，最终保存 head/CI 以 Git/GitHub 和本轮证据为准；不沿用旧绿。没有授权或执行 PR Ready/合并、workflow dispatch、设置/Secrets/opt-in、镜像发布部署或恢复 P5。
 
-### P6 第九小步：功能分支保留历史同步 main（本地验证完成）
+### P6 第十一步：独立发布基础 PR 与 feature 保存（本轮授权）
+
+- 隔离工作树 config/p6-release-bootstrap/worktree，分支 chore/fork-dockerhub-release-bootstrap，直接从 main57acb02c 起步。89f0a542 唯一父为该 main，树 bb64c8f512f9872fe0f118e3a9e28996f5b0ed62，仅10个发布文件/1471行新增，无 feature 祖先、导航、认证、Widget、依赖/锁文件、原 Docker/CI 定义改动。
+- 纯 main 基线为576文件/2023测试；发布基础为577文件/2089测试、187项工作流测试，安装锁文件/Lint/隔离应用构建/格式/语法通过，均首次全量成功。7个代码/YAML主动诊断clean，2个Docker路径unsupported、1份Markdown inconclusive；不能套用功能分支2416计数，也不称真实镜像构建完成。
+- [PR #4 CI run 42552833352](https://github.com/kanon-H/homepage/actions/runs/42552833352) attempt1 success；check128951971443、Fork verification/App15368、精确89f0a542及全部关键步骤核实。PR测试快照32fc6ea2ca620db2d585f8b432d7421e77c0e46b的树等于基础head。仅恢复中断的GET观察，没有rerun/dispatch；main完整保护、其他设置、默认token read前后不变。
+- 原13项按用户本轮授权另存 feature，10项发布文件与独立基础逐项同hash，三份交接补充本轮事实且保留自动格式化，不stash/丢弃。新 feature head 的真实CI结果另见 config/p6-release-bootstrap/evidence/；不能以PR4/main或旧c89检查代签新功能head。
+- 下一步须另行授权PR #4 Ready/保留历史合入main，并在新main CI通过后决定一次publish=false真实build-only。P6-R02仍缺人工合并/main CI；R03～R08、上游写入/定时及P5仍独立待办。发布与操作指南和DEVELOPMENT13继续有效，不索取DockerHub Token。
+
+### P6 第十小步：Docker Hub 发布基础（历史本地开发；实际提交/PR以上方为准）
+
+- 新增 fork-release.yml（main-only 手动控制器，默认 build-only）与 fork-release-tag.yml（自有 fork-vX.Y.Z tag 仅通知 main，不 checkout/执行候选代码、不接触注册表凭据）。实际发布须 Repository variable DOCKERHUB_RELEASE_ENABLED=true、精确版本、首次 run 及受保护 dockerhub-release Environment；本轮不配置这些外部项。
+- 独立 Dockerfile.fork 保留原上游 Dockerfile/工作流，固定同 Alpine Node24.22.1 基础镜像多平台 digest、pnpm10.34.9/GPL-3.0-only。白名单 Git 对象导出 context，只复制已提交源码；拒绝符号链接、环境/私有配置和宿主 .next/node_modules。不改导航、认证、Widget、依赖/锁文件或既有 fork-ci 定义/pin。
+- 无注册表凭据的 build job 重新安装/Lint/测试/应用构建、双架构 OCI 构建与 Node 运行时结构冒烟。publisher 只执行 main 的 stdlib 控制器，核对同 job artifact ID/归档 SHA256、main/tag/祖先与镜像标签，不重建；Token 只用内存 FD，不写 argv/env 子进程或具名凭据文件。已有版本/SHA 标签或未知状态失败，不自动重试写入/覆盖。真正不可变仍需 Hub 服务端策略兜底。
+- 新增 66 项发布策略测试，含真实隔离 Git/二进制 context/内存 FD 和模拟 registry/Skopeo。最终 frozen/offline install、Lint、187 项工作流测试、587 文件/2416 项全量测试与隔离应用生产构建通过；仅两条既有警告，未弱化测试。主动诊断最终6 confirmed clean、2 Docker路径unsupported、publisher及4份Markdown共5 inconclusive，详见 DEVELOPMENT 10.5 与 config/p6-release/evidence/，不把空诊断计全clean。模拟通过不证明实际 Skopeo/OCI/Hub。当前无 Docker/Podman，Dockerfile 无语言服务答复，不冒称容器验收完成。
+- 操作与权限说明见[发布指南](docs/more/fork-release.md)。DEVELOPMENT 第 13 节用固定 ID 跟踪剩余阶段/依赖/授权与完成证据，替换已过期的“下一步先同步 main”。PR #1 保持 Draft，不因流水线开发而上线导航功能。
+
+### P6 第九小步：功能分支保留历史同步 main（历史；已推送且新 CI 通过）
 
 - 上轮三份交接已单独提交/推送为 aba75941，其真实 CI run 42464356595/check 128680299573 第一次成功，精确 head、App 15368 和全部步骤已核实；这仅作本轮基线，不替代后续新 head CI。
 - 只读预演 feature aba75941 与 main57acb02c 得到 clean-merge、无冲突。纯 merge 提交 d34ccc1b 的双父顺序为 aba75941、57acb02c，树 a2853c2d77dfd766502b5aad51a95865e1a9d9ba 与预演完全一致；内容仅新增 FORK_AUTOMATION.md，没有业务、认证、Widget、依赖/锁文件、Docker 或工作流定义变更。不 rebase/squash/force，也没有将功能 PR 合入 main。
@@ -295,7 +311,7 @@ P0 实际验证：
 
 ## 建议下一步
 
-main 57acb02c 的新 CI 和一次手动只读预检已通过，官方 main 目前无新更新。下一步先确认保存本地交接和将 main merge 到 feature/multi-address 的授权范围，再同步功能分支并重跑 CI；不 rebase/force、不合并 PR #1。写入控制器尚无任何真实 run/PR 正例，执行它可能在上游更新时创建分支/PR，须单独授权；不能把当前 up-to-date 当写入已验证。每周只读配置已进入 main，但定时实际触发未验；写入 opt-in 变量未创建。详见 DEVELOPMENT 9.4；本轮已获用户单独授权，仅提交/推送原工作树三份交接；功能分支同步、PR #1 合并和写入演练仍未授权，镜像发布/回滚仍待开发。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
+独立发布基础 Draft PR #4 已创建且精确 head CI通过，P6-R02 的下一步是单独授权审查后标记Ready、以merge commit合入main并核新main CI；不要为此提前合并含未完成 P5 的 PR #1。原feature13项保存/推送已获本轮授权，实际新head与CI结果以Git/GitHub及本轮证据为准。随后按 P6-R03 在可信 main 真正运行无 Docker Hub 凭据的 build-only/容器验收，再由所有者配置 Environment Secrets 与 Hub 不可变策略，明确启用 opt-in，逐项做首次发布、独立拉取和旧 digest 回滚。Docker Hub Token 不发给 Agent。流水线尚未真实运行，默认关闭发布，不能将当前本地测试代签后续阶段。真实上游写入/每周调度仍按 P6-S01 独立授权和验证，不伪造更新、不直接换 PAT/App；上次只读 up-to-date 不代表当前官方没有新更新。P5 排查继续暂停，下列路线仅在用户选择恢复时使用：
 
 1. 已取得上述 macOS 两浏览器 8 项基础反馈（含原生右键/Shift 与 Cmd-click）；下一步按[人工验收模板](docs/more/network-acceptance.md)补物理触屏及完整键盘焦点/Widget统计等未覆盖场景。当前设备没有中键记为未执行，不改成通过；未报告的 OS 版本/viewport 不推断。
 2. 如实际使用 OIDC 或生产反代/CDN，另行明确授权和目标，再验证真实登录/退出、HTTPS/canonical URL 和匿名缓存隔离；本轮只验证受控 nginx，不操作生产。
@@ -315,11 +331,11 @@ P0 基础外部设置已按本轮授权完成；GitHub 默认 main 和本地 ori
 6. 卡片含 `overflow-clip`，菜单要避免裁剪；右键不能覆盖 Widget/统计区域操作。
 7. 恢复前不让可扩展服务误开默认地址；存储失败仍要完成 ready。
 8. `/api/validate` 现有错误会阻断首页，不应直接塞入非致命网络警告。
-9. 上游镜像任务限定官方仓库，不能认为 Fork 后自动能发布；Docker `CI=true` 要求已有构建产物。
+9. 上游镜像任务限定官方仓库；Fork 使用独立 Dockerfile.fork，从允许的 Git 源码重新构建，不走上游 CI=true 的宿主预构建路径。
 10. GitHub GITHUB_TOKEN 创建 PR 后不一定触发其他普通工作流，自动同步须验证 CI 确实被触发。
-11. 当前测试/构建 pnpm 9/10 不一致；Docker 非 CI 用 latest；正式发布需锁定工具。
-12. 当前 Docker license label 与根 GPL v3 不一致，发布前核实修正。
-13. 普通 `.env` 不保证被 Git 忽略，`.env*.local` 也不保证被 Docker context 排除，不提交真实秘密。
+11. 继承 CI/原 Dockerfile 的工具版本差异仍保留；Fork 镜像独立固定 Node/pnpm/base digest，不宣称整个上游已统一或位级可复现。
+12. 原 Dockerfile 的 Apache label 未改；新 Fork 镜像采用与根 LICENSE 一致的 GPL-3.0-only 并带 LICENSE，不能选错 Dockerfile 发布。
+13. 普通 .env 不保证被 Git 忽略。Fork context 采用 Git 对象白名单和专用 ignore 双重排除，但不能把已经公开提交的任意文件内容自动判定无秘密；审查仍必需。
 14. 所有“功能完成”“测试通过”“发布成功”必须附实际证据，不能从文档推断。
 
 ## 后续交接如何更新

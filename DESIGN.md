@@ -1,6 +1,6 @@
 # Homepage 多地址导航扩展设计
 
-> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查/正例及失败负例已核验，只读预检及同步 PR/CI 写入逻辑已本地实现，独立基础 PR #3 已合入 main，新 main CI 与真实只读预检通过，写入同步/发布仍待验证，不表示扩展整体已验收。
+> 状态：P0 本地及基础外部设置、P1～P4 功能和 P5 自动化/使用文档已完成；Chromium 真实浏览器自动化与本地 HTTPS/nginx 缓存验证通过。人工原生交互、物理设备及目标部署环境验收未完成；P6 CI 基础及 Fork PR 真实 CI 已通过，main 必需检查/正例及失败负例已核验，只读预检及同步 PR/CI 写入逻辑已本地实现，独立基础 PR #3 已合入 main，新 main CI 与真实只读预检通过，写入同步待实跑，Docker Hub 发布基础已独立提交并建Draft PR #4、真实应用CI通过，但尚未合入main，真实容器/发布仍待验，不表示扩展整体已验收。
 > 读者：仓库所有者、后续开发者、从本目录启动的新会话 Agent。
 > 规约版本：v1。行为冲突时以 [SPEC.md](SPEC.md) 为准，开发与发布见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
@@ -328,7 +328,7 @@ P1 已在共享服务响应边界复用纯规范化函数；P3/P4 已提供 UI �
 gethomepage/homepage main
   → upstream integration PR
   → kanon-H/homepage main（含二开）
-  → 自有发布标签 / GHCR
+  → 自有发布标签 / Docker Hub（main 控制器，缺省关闭发布）
   → 可选 Gitea 单向备份
 ```
 
@@ -346,19 +346,27 @@ gethomepage/homepage main
 
 ## 10. 发布与长期存储
 
-自有镜像建议先使用 `ghcr.io/kanon-h/homepage`，仓库路径小写。自有标签建议 `fork-v0.1.0` 一类，与上游 `v2.7.0` 标签区分；版本元信息记录自有版本、上游基线、源码 SHA、构建时间。
+用户本轮选择 Docker Hub，替代原 GHCR 优先计划；镜像默认 Docker Hub 用户名/homepage，可用 DOCKERHUB_IMAGE 指定组织仓库。自有版本仅接受 fork-vX.Y.Z，与上游 v* 标签区分，不发布 latest。新工作流与四份stdlib发布工具已独立提交89f0a542并创建Draft PR #4，其真实应用CI通过；尚未合入main或实跑镜像，实际启用/发布需要后续授权和设置。配置与完整操作见[发布指南](docs/more/fork-release.md)，开发追踪见 DEVELOPMENT 第 13 节。
+
+Fork 专用 Dockerfile.fork/白名单 context 不修改上游 Dockerfile：同 Alpine 的 Node24.22.1 多平台 digest、pnpm10.34.9、GPL-3.0-only 和 LICENSE 固定。main-only 控制器验证真实 main/tag/祖先及发布关键文件；版本标签通知只 dispatch main，不执行候选代码或读注册表凭据。无 Docker Hub 凭据的 build job 从 Git 对象导出安全 context，重跑质量门禁、构建双架构 OCI 并做两平台运行时结构冒烟。独立 Environment publisher 只运行可信 main 代码，验证同一 build artifact ID/SHA 与 OCI 元信息后原样 copy，不在持有注册表凭据时重建/安装应用代码。Token 用未链接 tmpfs FD，仅在内存，不进入镜像、argv 或子进程环境。
+
+版本/SHA 标签须都不存在；认证/网络/未知错误失败，不自动重试或覆盖，copy 后 digest 必须读回一致。预检不是注册表原子锁，Docker Hub 服务端不可变策略及 Environment main-only/reviewer 必须在真实启用前核实。真实容器 HTTP/认证/挂载、Hub 推送/独立拉取、旧 digest 回滚和供应链增强都独立待验；默认 opt-in 未设置，结构/模拟测试不能替代这些验收。
 
 上游 `docker-publish.yml` 有官方仓库条件，Fork 不能直接发布。P6 第一小步已新增 `.github/workflows/fork-ci.yml`，只在本 Fork 对 main PR/main push/手动事件执行只读测试与生产构建；固定 Node `24.22.1`、pnpm `10.34.9`，不发布/上传产物，不作为已完成的 Docker 构建路径。`scripts/fork-ci-build.sh` 使用临时虚构配置及随机认证变量，并拒绝自动加载本地生产 .env 文件。其余继承工作流已补齐官方仓库 job 条件并推送为 `12116208`。现已在本 Fork 创建 [Draft PR #1](https://github.com/kanon-H/homepage/pull/1)，本轮提交前已核实 c40d9eb6 的真实 Fork CI 通过，新 head 仍需重新核实。main 的必需检查现已通过 GitHub API 配置为 `Fork verification` / github-actions App 15368、strict=true，其他保护原值不变；这是保护元数据生效，不是代码已合入 main，继承工作流条件的 main 版本仍须另行授权合并，pull_request_target 尤其依赖 base 分支版本。
 
 已补充失败门禁负例：[临时 PR #2](https://github.com/kanon-H/homepage/pull/2) 非 Draft、Git 无冲突，`Fork verification` / App 15368 预期 exit 42 后真实 failure，GitHub 报告 blocked；验证后已关闭 PR 并删除临时分支，主 PR/分支/完整保护不变。未调用合并 API，也未独立测试检查完全缺失等场景。
 
-写入流程只使用内置 GITHUB_TOKEN，可信同步控制器和执行候选代码的只读 CI 分离，不直接替换成 PAT/App。发布前固定校验默认 main 的 fork-ci.yml 文本 SHA256、候选中定义未改及入口 active；显式 dispatch 到同步分支，机器人意图评论先持久化，未知响应/有意图无 run 不盲重发。核验 run/repo/分支/head、job 的固定 Fork check URL、check id/name/App/源码及全部关键步骤；失败/跳过/超时不算通过。仅在 main 工作流 checkout 另一 SHA 不会改变 check_run 归属，不能冒充 PR 门禁。本地隔离/模拟通过不证明实际 GitHub 权限、触发和关联；两项必要 Actions/Issues 设置已按后续明确授权完成并回读，默认 token read 和 main 保护不变；独立基础 PR #3 已按后续授权以 merge commit 合入 main，新 main CI 与一次手动只读预检均成功；每周只读配置进入 main，但定时实际触发未验。真实写入同步 PR/CI 演练和 opt-in 启用仍须另行授权，写入控制器未运行，写入定时变量不存在。自有镜像工作流仍待实现。流程/恢复策略及验证证据见 [DEVELOPMENT.md](DEVELOPMENT.md)。
+写入流程只使用内置 GITHUB_TOKEN，可信同步控制器和执行候选代码的只读 CI 分离，不直接替换成 PAT/App。发布前固定校验默认 main 的 fork-ci.yml 文本 SHA256、候选中定义未改及入口 active；显式 dispatch 到同步分支，机器人意图评论先持久化，未知响应/有意图无 run 不盲重发。核验 run/repo/分支/head、job 的固定 Fork check URL、check id/name/App/源码及全部关键步骤；失败/跳过/超时不算通过。仅在 main 工作流 checkout 另一 SHA 不会改变 check_run 归属，不能冒充 PR 门禁。本地隔离/模拟通过不证明实际 GitHub 权限、触发和关联；两项必要 Actions/Issues 设置已按后续明确授权完成并回读，默认 token read 和 main 保护不变；独立基础 PR #3 已按后续授权以 merge commit 合入 main，新 main CI 与一次手动只读预检均成功；每周只读配置进入 main，但定时实际触发未验。真实写入同步 PR/CI 演练和 opt-in 启用仍须另行授权，写入控制器未运行，写入定时变量不存在。自有 Docker Hub 工作流现已本地实现，尚未合入 main/实跑；流程、恢复策略和验证证据见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
 未来若引入 SQLite，必须先给出 ADR：数据归属、单文件挂载、事务、备份一致性、迁移/回滚、多副本限制。引入数据库不是当前阶段任务，也不能将其用于替换已稳定的 YAML 配置。
 
 ## 11. 当前交付状态
 
-功能分支已按本轮结构化授权将 Fork main57acb02c 保留历史 merge 到 feature/multi-address。纯合并提交 d34ccc1b62b1dd2d98646309fc2d0683b7bfea16 的双父顺序为已推送/CI 成功的 aba75941、main57acb02c；树 a2853c2d77dfd766502b5aad51a95865e1a9d9ba 与只读预演一致，无冲突，内容仅新增 FORK_AUTOMATION.md，不再缺 main 的两个祖先。业务、认证、Widget、依赖/锁文件、Docker 和工作流定义未改。在真实合并提交上 frozen/offline install、Lint、121 项工作流测试、586 文件/2350 项全量测试、隔离生产构建及脚本语法检查首次通过；两条既有警告保留，未弱化测试。必要交接独立文档提交，最终推送 head/新 CI 的精确 App/head/步骤按 GitHub 与 config/p6-feature-sync/evidence/ 另行核实，不以旧绿色代签。PR #1 保持 Draft/未合并；不改 main、保护或设置，不 dispatch 写入同步、不启用定时、不发布部署或恢复 P5。过程与边界见 DEVELOPMENT 9.5。
+本轮按用户结构化授权交付独立发布基础：89f0a542唯一父为main57acb02c，无feature祖先，仅10个发布文件，Draft PR #4指向本Fork main。纯main基线576文件/2023测试，基础补丁577文件/2089测试、187项工作流/安装/Lint/隔离应用构建通过；独立工作树主动诊断7 clean、2 Docker unsupported、1 MD inconclusive。真实run42552833352/check128951971443、App15368、精确head/全部步骤成功，PR测试树等于基础树。main/保护/设置未变，PR #1/#4均Draft，未Ready/merge或dispatch/发布。原feature13项另获本轮提交推送与新CI核查授权，实际保存head/CI按Git/GitHub和本轮证据；保留文档自动格式化。P6-R02仍缺人工合并/main CI，R03之后仍待授权，详见DEVELOPMENT10.6/13。
+
+上一轮在feature@c89b6a93增加独立Docker Hub发布基础、66项新测试与指南并更新规划，开发阶段未提交/推送/改外部设置或真实发布；本轮提交/PR状态以上方为准。最终 frozen/offline install、Lint、187 项工作流测试、587 文件/2416 项全量测试及隔离应用构建通过；主动诊断6 confirmed clean、2 unsupported、5 inconclusive，细分与证据见 DEVELOPMENT 10.5/config/p6-release/evidence，不能称全静态clean；本机没有 Docker/Podman，实际双架构容器/推送/拉取/回滚仍待验。后续开发用 DEVELOPMENT 13 的固定 ID 跟踪，不能将 YAML 存在或旧 c89 CI 绿灯当已完成。P5 仍暂停，不合并 PR #1。
+
+上一轮功能分支已按结构化授权将 Fork main57acb02c 保留历史 merge 到 feature/multi-address。纯合并提交 d34ccc1b62b1dd2d98646309fc2d0683b7bfea16 的双父顺序为已推送/CI 成功的 aba75941、main57acb02c；树 a2853c2d77dfd766502b5aad51a95865e1a9d9ba 与只读预演一致，无冲突，内容仅新增 FORK_AUTOMATION.md，不再缺 main 的两个祖先。业务、认证、Widget、依赖/锁文件、Docker 和工作流定义未改。在真实合并提交上 frozen/offline install、Lint、121 项工作流测试、586 文件/2350 项全量测试、隔离生产构建及脚本语法检查首次通过；两条既有警告保留，未弱化测试。必要交接独立文档提交，最终推送 head/新 CI 的精确 App/head/步骤按 GitHub 与 config/p6-feature-sync/evidence/ 另行核实，不以旧绿色代签。PR #1 保持 Draft/未合并；不改 main、保护或设置，不 dispatch 写入同步、不启用定时、不发布部署或恢复 P5。过程与边界见 DEVELOPMENT 9.5。
 
 此前基础 [PR #3](https://github.com/kanon-H/homepage/pull/3) 已按单独授权以 merge commit 合入 main57acb02c，父为旧 main2e5f1013 和基础 c64db269，19 文件的树与已审基础一致；源分支保留。main push CI run 42452955655/check 128645880913 的 App/head/全部步骤成功；仅一次手动只读预检 run 42454077403，真实日志为 main57acb02c/官方main2e5f1013/up-to-date，无候选树或冲突。写入控制器未实跑、opt-in 变量未创建，不证明真实更新 PR/CI、workflow-file 写入权限或实际每周调度。证据见 DEVELOPMENT 9.4；P5、真实写入、GHCR 双架构和回滚仍未完成，下列较早阶段保留为历史记录。
 
