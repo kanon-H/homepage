@@ -237,7 +237,10 @@ export function runDocker(args, { input } = {}) {
     const detail =
       String(result.stderr || result.error?.message || "")
         .split("\n")
-        .filter(Boolean)[0] || "";
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("at "))
+        .slice(0, 3)
+        .join(" | ") || "";
     throw new Error(
       `SMOKE_DOCKER_TOOL_FAILED:${args[0]}${args[1] ? "/" + args[1] : ""}:${String(result.status)}:${detail
         .replace(/[A-Za-z0-9+/=_-]{40,}/g, "<redacted>")
@@ -294,11 +297,42 @@ export async function verifyApplication(image, arch, deps = {}) {
     const fixture = applicationFixture();
     const password = randomBytes(32).toString("hex");
     const secret = randomBytes(48).toString("hex");
+    let failure;
+    let stage = "volume-create";
     try {
       requireRelease(
         tool(["volume", "create", "--label", `${ownerLabel}=${owner}`, volume]).trim() === volume,
         "SMOKE_VOLUME_CREATE_FAILED",
       );
+      stage = "volume-chown";
+      // A fresh volume is root:root. Real deployments pre-own the config directory
+      // for PUID:PGID, so mirror that here before seeding as the target identity;
+      // otherwise the non-root seed could not write and the gate would fail for a
+      // reason that has nothing to do with the image.
+      tool([
+        "run",
+        "--rm",
+        "--label",
+        `${ownerLabel}=${owner}`,
+        "--platform",
+        `linux/${arch}`,
+        "--network",
+        "none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--cap-add=CHOWN",
+        "--security-opt=no-new-privileges",
+        "--user",
+        "0:0",
+        "--mount",
+        `type=volume,source=${volume},target=/fixture`,
+        "--entrypoint",
+        "sh",
+        image,
+        "-c",
+        `chown ${uid}:${gid} /fixture`,
+      ]);
+      stage = "config-seed";
       tool(
         [
           "run",
@@ -315,6 +349,8 @@ export async function verifyApplication(image, arch, deps = {}) {
           "--read-only",
           "--cap-drop=ALL",
           "--security-opt=no-new-privileges",
+          "--user",
+          `${uid}:${gid}`,
           "--mount",
           `type=volume,source=${volume},target=/fixture`,
           "--entrypoint",
@@ -338,40 +374,34 @@ export async function verifyApplication(image, arch, deps = {}) {
         PUID: String(uid),
         PGID: String(gid),
       };
-      tool(
-        [
-          "create",
-          "--name",
-          name,
-          "--label",
-          `${ownerLabel}=${owner}`,
-          "--platform",
-          `linux/${arch}`,
-          "--network",
-          "bridge",
-          "--publish",
-          "127.0.0.1::3000",
-          "--cap-drop=ALL",
-          "--cap-add=CHOWN",
-          "--cap-add=DAC_OVERRIDE",
-          "--cap-add=FOWNER",
-          "--cap-add=SETUID",
-          "--cap-add=SETGID",
-          "--security-opt=no-new-privileges",
-          "--memory=1g",
-          "--pids-limit=256",
-          "--mount",
-          `type=volume,source=${volume},target=${mount}`,
-          "--env-file=/dev/stdin",
-          image,
-        ],
-        {
-          input:
-            Object.entries(environment)
-              .map(([key, value]) => `${key}=${value}`)
-              .join("\n") + "\n",
-        },
-      );
+      tool([
+        "create",
+        "--name",
+        name,
+        "--label",
+        `${ownerLabel}=${owner}`,
+        "--platform",
+        `linux/${arch}`,
+        "--network",
+        "bridge",
+        "--publish",
+        "127.0.0.1::3000",
+        "--cap-drop=ALL",
+        "--cap-add=CHOWN",
+        "--cap-add=DAC_OVERRIDE",
+        "--cap-add=FOWNER",
+        "--cap-add=SETUID",
+        "--cap-add=SETGID",
+        "--security-opt=no-new-privileges",
+        "--memory=1g",
+        "--pids-limit=256",
+        "--mount",
+        `type=volume,source=${volume},target=${mount}`,
+        // /dev/stdin cannot be re-opened as an env file when stdin is a pipe.
+        // Values are synthetic fixtures only; they are passed inline instead.
+        ...Object.entries(environment).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
+        image,
+      ]);
       tool(["start", name]);
       let healthy = false;
       for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -386,6 +416,7 @@ export async function verifyApplication(image, arch, deps = {}) {
         }
         await pause(2000);
       }
+      stage = "health";
       requireRelease(healthy, "SMOKE_CONTAINER_START_TIMEOUT");
       const port = tool(["port", name, "3000/tcp"]).trim();
       requireRelease(/^127\.0\.0\.1:[1-9]\d{0,4}$/.test(port), "SMOKE_PORT_NOT_LOOPBACK");
@@ -405,13 +436,34 @@ export async function verifyApplication(image, arch, deps = {}) {
         process.stdout.write(fs.readFileSync('/app/.next/BUILD_ID', 'utf8').trim());
       `;
       const exec = ["exec", "--user", `${uid}:${gid}`, name, "node", "-e", runtimeCheck];
+      stage = "runtime-check";
       const buildId = tool(exec).trim();
+      stage = "http-gate";
       const checks = await probe(`http://${port}`, fixture, password, buildId);
+      stage = "config-recheck";
       requireRelease(tool(exec).trim() === buildId, "SMOKE_CONFIG_CHANGED_AFTER_HTTP");
+      stage = "done";
       results.push({ platform: `linux/${arch}`, mount, uid, gid, checks, healthy: true });
-    } finally {
-      cleanup(tool, owner, name, volume);
+    } catch (error) {
+      // Remember the real failure: a cleanup problem must never replace it, or the
+      // actual gate that failed becomes invisible in CI logs.
+      failure = error;
     }
+    let cleanupError;
+    try {
+      cleanup(tool, owner, name, volume);
+    } catch (error) {
+      cleanupError = error;
+    }
+    if (failure) {
+      if (cleanupError) {
+        const original = String(failure.message || failure);
+        requireRelease(false, `${original}; cleanup also failed: ${String(cleanupError.message || cleanupError)}`);
+      }
+      if (failure instanceof Error) failure.message = `[stage=${stage} mount=${mount} uid=${uid}] ${failure.message}`;
+      throw failure;
+    }
+    if (cleanupError) throw cleanupError;
   }
   return results;
 }

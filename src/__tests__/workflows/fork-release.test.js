@@ -28,7 +28,7 @@ import {
   runTool,
   withRegistryAuth,
 } from "../../../scripts/fork-image-publish.mjs";
-import { smokeArchive } from "../../../scripts/fork-image-smoke.mjs";
+import { smokeArchive, verificationFailureCode } from "../../../scripts/fork-image-smoke.mjs";
 import {
   githubGet,
   isSha,
@@ -381,6 +381,8 @@ const rawIndex = JSON.stringify({
   manifests: [
     { platform: { os: "linux", architecture: "amd64" } },
     { platform: { os: "linux", architecture: "arm64" } },
+    // Real buildx archives also carry provenance manifests with unknown platforms.
+    { platform: { os: "unknown", architecture: "unknown" } },
   ],
 });
 const manifestDigest = `sha256:${createHash("sha256").update(rawIndex).digest("hex")}`;
@@ -447,7 +449,41 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     expect(() => inspectArchive(request.archive, { ...plan, source_sha: upstream }, metadataTool)).toThrow(
       "IMAGE_LABEL_MISMATCH",
     );
-    expect(() => inspectArchive(request.archive, plan, () => '{"manifests":[]}')).toThrow("EXPECTED_TWO_PLATFORMS");
+    // An empty platform set is reported by the platform gate, not the shape gate.
+    expect(() => inspectArchive(request.archive, plan, () => '{"manifests":[]}')).toThrow("WRONG_IMAGE_PLATFORMS");
+  });
+  it("resolves a wrapped index from the archive blob store and ignores attestations", () => {
+    const innerDigest = `sha256:${"c".repeat(64)}`;
+    const outer = JSON.stringify({ manifests: [{ digest: innerDigest }] });
+    const inner = JSON.stringify({
+      manifests: [
+        { platform: { os: "linux", architecture: "amd64" } },
+        { platform: { os: "linux", architecture: "arm64" } },
+        { platform: { os: "unknown", architecture: "unknown" } },
+      ],
+    });
+    const tool = vi.fn((command, args) => {
+      if (command === "tar") {
+        expect(args).toEqual(["-xOf", request.archive, `blobs/sha256/${innerDigest.slice(7)}`]);
+        return inner;
+      }
+      // The archive's own top-level index is the wrapper; config reads stay normal.
+      if (args.includes("--raw")) return outer;
+      return metadataTool(command, args);
+    });
+    expect(inspectArchive(request.archive, plan, tool)).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(tool).toHaveBeenCalledWith("tar", expect.any(Array));
+    // A single platform is still rejected even when wrapped.
+    const onlyAmd64 = JSON.stringify({ manifests: [{ platform: { os: "linux", architecture: "amd64" } }] });
+    expect(() =>
+      inspectArchive(request.archive, plan, (command, args) =>
+        command === "tar" ? onlyAmd64 : args.includes("--raw") ? outer : metadataTool(command, args),
+      ),
+    ).toThrow("WRONG_IMAGE_PLATFORMS");
+    // The digest identity must still come from the outer index bytes.
+    expect(inspectArchive(request.archive, plan, tool)).toBe(
+      `sha256:${require("node:crypto").createHash("sha256").update(outer).digest("hex")}`,
+    );
   });
   it("copies exactly two immutable aliases, preserves digest and only passes an auth FD", async () => {
     const deps = publishing();
@@ -559,6 +595,18 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     await expect(smokeArchive(request.archive, plan, { ...deps, application: async () => [] })).rejects.toThrow(
       "APPLICATION_SMOKE_INCOMPLETE",
     );
+  });
+  it("keeps the scrubbed tool diagnostic instead of collapsing it to a generic code", () => {
+    expect(verificationFailureCode(new Error("SMOKE_DOCKER_TOOL_FAILED:run:1:cannot connect"))).toBe(
+      "SMOKE_DOCKER_TOOL_FAILED:run:1:cannot connect",
+    );
+    expect(verificationFailureCode(new Error("HTTP_GATE_FAILED"))).toBe("HTTP_GATE_FAILED");
+    // Unexpected payloads (secrets, quotes, newlines, oversized text) are collapsed.
+    expect(verificationFailureCode(new Error('token="abc" leaked'))).toBe("IMAGE_VERIFICATION_FAILED");
+    expect(verificationFailureCode(new Error("line1\nline2"))).toBe("IMAGE_VERIFICATION_FAILED");
+    expect(verificationFailureCode(new Error("A".repeat(401)))).toBe("IMAGE_VERIFICATION_FAILED");
+    expect(verificationFailureCode(new Error(""))).toBe("IMAGE_VERIFICATION_FAILED");
+    expect(verificationFailureCode(undefined)).toBe("IMAGE_VERIFICATION_FAILED");
   });
   it.skipIf(process.platform !== "linux" || !existsSync("/dev/shm"))(
     "keeps auth only in an unlinked tmpfs FD readable by the child, not argv/env",
