@@ -2,9 +2,14 @@
 
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import ModeSwitcher from "components/network/mode-switcher";
 import { renderWithProviders } from "test-utils/render-with-providers";
+import { NetworkProvider, useNetwork } from "utils/contexts/network";
+import { normalizeNetworkSettings } from "utils/network/config";
+import { getServiceSearchEntry } from "utils/network/navigation";
+import { NETWORK_PREFERENCE_KEY } from "utils/network/storage";
 
 const { state, useSWR, getStoredProvider } = vi.hoisted(() => ({
   state: {
@@ -457,5 +462,187 @@ describe("components/quicklaunch", () => {
     });
 
     expect(input).toHaveValue("");
+  });
+});
+
+const networkSettings = {
+  extensions: {
+    network: {
+      modes: [
+        { id: "lan", label: "LAN" },
+        { id: "vpn", label: "VPN" },
+      ],
+    },
+  },
+};
+const networkService = Object.freeze({
+  name: "Network App",
+  type: "service",
+  href: "https://default.example.invalid",
+  target: "_self",
+  extensions: { network: { addresses: { lan: "http://lan.example.invalid/Case" } } },
+});
+const bookmark = Object.freeze({
+  name: "Network Bookmark",
+  href: "https://bookmark.example.invalid",
+  extensions: { network: { addresses: { lan: "http://bookmark-lan.example.invalid" } } },
+});
+
+function NetworkSearch() {
+  const network = useNetwork();
+  return (
+    <>
+      <ModeSwitcher />
+      <Wrapper servicesAndBookmarks={[getServiceSearchEntry(networkService, network), bookmark]} />
+    </>
+  );
+}
+
+describe("quicklaunch network navigation", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    state.widgets = {};
+    localStorage.removeItem(NETWORK_PREFERENCE_KEY);
+  });
+  afterEach(() => {
+    act(() => vi.runOnlyPendingTimers());
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["click", "lan"],
+    ["Enter", "lan"],
+    ["click", "vpn"],
+    ["Enter", "vpn"],
+  ])("uses %s with selected %s while the panel stays open", (method, mode) => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <NetworkSearch />
+      </NetworkProvider>,
+      { settings: { target: "_parent", quicklaunch: { showSearchSuggestions: false } } },
+    );
+    const input = screen.getByPlaceholderText("Search");
+    fireEvent.change(input, { target: { value: "network app" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "lan" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: mode } });
+    expect(input).toHaveValue("network app");
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-hidden", "false");
+    if (method === "click") fireEvent.click(screen.getByText("Network App").closest("button"));
+    else fireEvent.keyDown(input, { key: "Enter" });
+    expect(open).toHaveBeenCalledWith(
+      mode === "lan" ? networkService.extensions.network.addresses.lan : networkService.href,
+      "_self",
+      "noreferrer",
+    );
+    expect(networkService.href).toBe("https://default.example.invalid");
+  });
+
+  it("updates an already open search from another tab's storage event without opening automatically", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <NetworkSearch />
+      </NetworkProvider>,
+    );
+    const input = screen.getByPlaceholderText("Search");
+    fireEvent.change(input, { target: { value: "network app" } });
+    act(() =>
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: NETWORK_PREFERENCE_KEY,
+          storageArea: window.localStorage,
+          newValue: '{"version":1,"mode":"lan"}',
+        }),
+      ),
+    );
+    expect(input).toHaveValue("network app");
+    expect(screen.getByRole("combobox")).toHaveValue("lan");
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(open).toHaveBeenCalledWith(networkService.extensions.network.addresses.lan, "_self", "noreferrer");
+  });
+
+  it("does not open or close on a recovering result and never queues an automatic open after ready", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const network = { settings: normalizeNetworkSettings(networkSettings), mode: "lan", ready: false };
+    const view = renderWithProviders(
+      <Wrapper servicesAndBookmarks={[getServiceSearchEntry(networkService, network)]} />,
+      { settings: {} },
+    );
+    const input = screen.getByPlaceholderText("Search");
+    fireEvent.change(input, { target: { value: "network app" } });
+    const button = screen.getByText("Network App").closest("button");
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("title", "network.restoring");
+    fireEvent.click(button);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-hidden", "false");
+    view.rerender(
+      <Wrapper servicesAndBookmarks={[getServiceSearchEntry(networkService, { ...network, ready: true })]} />,
+    );
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(open).toHaveBeenCalledExactlyOnceWith(
+      networkService.extensions.network.addresses.lan,
+      "_self",
+      "noreferrer",
+    );
+  });
+
+  it("keeps old results usable while an expandable result is recovering", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const pending = getServiceSearchEntry(networkService, {
+      settings: normalizeNetworkSettings(networkSettings),
+      mode: "lan",
+      ready: false,
+    });
+    renderWithProviders(<Wrapper servicesAndBookmarks={[pending, bookmark]} />, { settings: { target: "_self" } });
+    fireEvent.change(screen.getByPlaceholderText("Search"), { target: { value: "network" } });
+    expect(screen.getByText("Network App").closest("button")).toBeDisabled();
+    fireEvent.click(screen.getByText("Network Bookmark").closest("button"));
+    expect(open).toHaveBeenCalledWith(bookmark.href, "_self", "noreferrer");
+  });
+
+  it("keeps the generated search engine result independent of the network mode", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <NetworkSearch />
+      </NetworkProvider>,
+      { settings: { quicklaunch: { provider: "duckduckgo", showSearchSuggestions: false } } },
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "lan" } });
+    fireEvent.change(screen.getByPlaceholderText("Search"), { target: { value: "fictional query" } });
+    fireEvent.click(screen.getByText("DuckDuckGo quicklaunch.search").closest("button"));
+    expect(open).toHaveBeenCalledWith("https://duckduckgo.example/?q=fictional%20query", "_self", "noreferrer");
+  });
+
+  it("keeps bookmarks and directly entered URLs independent of the mode", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const view = renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <NetworkSearch />
+      </NetworkProvider>,
+      { settings: { target: "_self", quicklaunch: { provider: "duckduckgo", showSearchSuggestions: false } } },
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "lan" } });
+    const input = screen.getByPlaceholderText("Search");
+    fireEvent.change(input, { target: { value: "network bookmark" } });
+    fireEvent.click(screen.getByText("Network Bookmark").closest("button"));
+    expect(open).toHaveBeenCalledWith(bookmark.href, "_self", "noreferrer");
+    view.unmount();
+    renderWithProviders(
+      <NetworkProvider initialSettings={networkSettings}>
+        <NetworkSearch />
+      </NetworkProvider>,
+      { settings: { target: "_self", quicklaunch: { provider: "duckduckgo", showSearchSuggestions: false } } },
+    );
+    fireEvent.change(screen.getByPlaceholderText("Search"), { target: { value: "host.example.invalid/Case" } });
+    fireEvent.keyDown(screen.getByPlaceholderText("Search"), { key: "Enter" });
+    expect(open).toHaveBeenCalledWith("https://host.example.invalid/Case", "_self", "noreferrer");
   });
 });
