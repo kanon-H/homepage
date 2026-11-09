@@ -119,7 +119,7 @@ jobs:
             UPSTREAM_REVISION=${{ needs.plan.outputs.upstream_sha }}
       - name: Install OCI inspection tool
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends skopeo
-      - name: Inspect labels and smoke both platform runtime structures
+      - name: Verify both platform structures and HTTP auth Host mounts identity health
         run: node scripts/fork-image-smoke.mjs
       - name: Hash the exact tested OCI archive
         id: digest

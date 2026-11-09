@@ -1,9 +1,17 @@
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { inspectArchive, runTool } from "./fork-image-publish.mjs";
+import { verifyApplication } from "./fork-image-http.mjs";
+import { fileDigest, inspectArchive, runTool } from "./fork-image-publish.mjs";
+import { requireRelease } from "./fork-release.mjs";
 
-export function smokeArchive(archive, plan, tool = runTool) {
+export async function smokeArchive(archive, plan, deps = {}) {
+  const tool = deps.tool || runTool;
+  const application = deps.application || verifyApplication;
+  const hash = deps.hash || fileDigest;
+  const report = deps.report || ((result) => console.log(JSON.stringify(result)));
+  const archiveSha = await hash(archive);
   const digest = inspectArchive(archive, plan, tool);
   const check = `
     const fs = require('node:fs');
@@ -16,7 +24,7 @@ export function smokeArchive(archive, plan, tool = runTool) {
     if (fs.existsSync('/app/.env') || fs.existsSync('/app/.env.local')) throw Error('Unexpected environment file');
   `;
   for (const arch of ["amd64", "arm64"]) {
-    const image = `homepage-fork-smoke-${process.pid}:${arch}`;
+    const image = `homepage-fork-smoke-${randomUUID()}:${arch}`;
     let loaded = false;
     try {
       tool("skopeo", [
@@ -47,24 +55,34 @@ export function smokeArchive(archive, plan, tool = runTool) {
         "-e",
         check,
       ]);
+      const results = await application(image, arch);
+      requireRelease(
+        results.length === 2 && results.every((result) => result.healthy && result.checks > 0),
+        "APPLICATION_SMOKE_INCOMPLETE",
+      );
+      for (const result of results) report(result);
     } finally {
       if (loaded) tool("docker", ["image", "rm", image]);
     }
   }
+  requireRelease((await hash(archive)) === archiveSha, "SMOKE_ARCHIVE_CHANGED");
   return digest;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   try {
-    const digest = smokeArchive(process.env.RELEASE_ARCHIVE, {
+    const digest = await smokeArchive(process.env.RELEASE_ARCHIVE, {
       source_sha: process.env.RELEASE_SOURCE_SHA,
       version: process.env.RELEASE_VERSION,
       upstream_sha: process.env.RELEASE_UPSTREAM_SHA,
       created: process.env.RELEASE_CREATED,
     });
-    console.log(`Both platform runtime structures verified: ${digest}`);
-  } catch {
-    console.error("OCI platform, labels or runtime structure verification failed; no publication attempted.");
+    console.log(
+      `Both platform runtime structures and application HTTP/password/Host/mount/identity/health gates verified: ${digest}`,
+    );
+  } catch (error) {
+    const code = /^[A-Z0-9_]+$/.test(error?.message || "") ? error.message : "IMAGE_VERIFICATION_FAILED";
+    console.error(`OCI/application verification failed (${code}); no publication attempted. Do not rerun blindly.`);
     process.exitCode = 1;
   }
 }

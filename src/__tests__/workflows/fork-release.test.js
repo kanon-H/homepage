@@ -157,7 +157,7 @@ describe("Fork release workflow boundaries", () => {
     expect(names.indexOf("Export allowlisted committed build context")).toBeLessThan(
       names.indexOf("Install frozen dependencies"),
     );
-    expect(names.indexOf("Inspect labels and smoke both platform runtime structures")).toBeLessThan(
+    expect(names.indexOf("Verify both platform structures and HTTP auth Host mounts identity health")).toBeLessThan(
       names.indexOf("Upload only the tested OCI archive"),
     );
     expect(
@@ -483,14 +483,49 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     expect(fetcher.mock.calls[0][0]).not.toContain(request.token);
     expect(fetcher.mock.calls[0][1].redirect).toBe("error");
   });
-  it("checks both emulated runtime structures and removes only its temporary image tags", () => {
+  it("checks both emulated runtime structures and application gates before hashing the unchanged archive", async () => {
     const tool = vi.fn(metadataTool);
-    expect(smokeArchive(request.archive, plan, tool)).toBe(manifestDigest);
+    const application = vi.fn(async () => [
+      { healthy: true, checks: 90 },
+      { healthy: true, checks: 90 },
+    ]);
+    const hash = vi.fn(async () => "f".repeat(64));
+    await expect(smokeArchive(request.archive, plan, { tool, application, hash, report: vi.fn() })).resolves.toBe(
+      manifestDigest,
+    );
+    expect(application.mock.calls.map(([, arch]) => arch)).toEqual(["amd64", "arm64"]);
+    expect(hash).toHaveBeenCalledTimes(2);
     const runs = tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "run");
     expect(runs).toHaveLength(2);
     for (const [, args] of runs)
       expect(args).toEqual(expect.arrayContaining(["--rm", "--read-only", "--network", "none", "--cap-drop=ALL"]));
     expect(tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "image")).toHaveLength(2);
+  });
+  it("fails on an application gate failure and still removes the loaded image", async () => {
+    const tool = vi.fn(metadataTool);
+    const application = vi.fn(async () => {
+      throw new Error("HTTP_GATE_FAILED");
+    });
+    await expect(
+      smokeArchive(request.archive, plan, { tool, application, hash: async () => "fixture" }),
+    ).rejects.toThrow("HTTP_GATE_FAILED");
+    expect(application).toHaveBeenCalledTimes(1);
+    expect(tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "image")).toHaveLength(1);
+  });
+  it("rejects archive mutation or incomplete application verification", async () => {
+    const deps = {
+      tool: metadataTool,
+      application: async () => [
+        { healthy: true, checks: 1 },
+        { healthy: true, checks: 1 },
+      ],
+      hash: vi.fn().mockResolvedValueOnce("before").mockResolvedValue("after"),
+      report: vi.fn(),
+    };
+    await expect(smokeArchive(request.archive, plan, deps)).rejects.toThrow("SMOKE_ARCHIVE_CHANGED");
+    await expect(smokeArchive(request.archive, plan, { ...deps, application: async () => [] })).rejects.toThrow(
+      "APPLICATION_SMOKE_INCOMPLETE",
+    );
   });
   it.skipIf(process.platform !== "linux" || !existsSync("/dev/shm"))(
     "keeps auth only in an unlinked tmpfs FD readable by the child, not argv/env",

@@ -16,6 +16,7 @@ export const RELEASE_FILES = [
   "scripts/fork-release.mjs",
   "scripts/fork-image-publish.mjs",
   "scripts/fork-image-smoke.mjs",
+  "scripts/fork-image-http.mjs",
 ];
 export const isSha = (value) => typeof value === "string" && value.length === 40 && /^[0-9a-f]{40}$/.test(value);
 export const isVersion = (value) =>
