@@ -231,7 +231,19 @@ export function runDocker(args, { input } = {}) {
     maxBuffer: 4 * 1024 * 1024,
     env: { PATH: process.env.PATH, HOME: "/nonexistent", LANG: "C.UTF-8" },
   });
-  requireRelease(!result.error && result.status === 0, "SMOKE_DOCKER_TOOL_FAILED");
+  if (result.error || result.status !== 0) {
+    // Diagnostics must stay secret-free: fixture credentials only travel via stdin,
+    // so argv and stderr never contain them. Cap length to keep logs readable.
+    const detail =
+      String(result.stderr || result.error?.message || "")
+        .split("\n")
+        .filter(Boolean)[0] || "";
+    throw new Error(
+      `SMOKE_DOCKER_TOOL_FAILED:${args[0]}${args[1] ? "/" + args[1] : ""}:${String(result.status)}:${detail
+        .replace(/[A-Za-z0-9+/=_-]{40,}/g, "<redacted>")
+        .slice(0, 200)}`,
+    );
+  }
   return result.stdout;
 }
 
