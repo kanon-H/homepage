@@ -69,6 +69,16 @@ export async function smokeArchive(archive, plan, deps = {}) {
   return digest;
 }
 
+// Keep the scrubbed diagnostic raised by the tools: it is already secret-free
+// (credential material only ever travels through stdin). Anything unexpected is
+// collapsed to a stable code so no raw payload can reach the log.
+export function verificationFailureCode(error) {
+  const raw = String(error?.message || "");
+  return /^[A-Z0-9_]/.test(raw) && /^[A-Za-z0-9_:/.<>\s-]+$/.test(raw) && raw.length <= 400
+    ? raw
+    : "IMAGE_VERIFICATION_FAILED";
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   try {
     const digest = await smokeArchive(process.env.RELEASE_ARCHIVE, {
@@ -81,7 +91,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       `Both platform runtime structures and application HTTP/password/Host/mount/identity/health gates verified: ${digest}`,
     );
   } catch (error) {
-    const code = /^[A-Z0-9_]+$/.test(error?.message || "") ? error.message : "IMAGE_VERIFICATION_FAILED";
+    const code = verificationFailureCode(error);
     console.error(`OCI/application verification failed (${code}); no publication attempted. Do not rerun blindly.`);
     process.exitCode = 1;
   }
