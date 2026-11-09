@@ -25,7 +25,11 @@
 
 全部 job 的 GITHUB_TOKEN 默认仅 contents:read；plan/publisher 另有 actions:read，只读核验 Environment 保护，只有无注册表凭据的 tag 通知 job 获得 actions:write。没有 packages:write、生产部署或自动合并权限。内置 token 生成的普通 push/tag 事件不保证触发另一个 workflow；未来若由机器人创建版本标签，应显式调用可信 main 控制器，不能假设普通触发有效。
 
-### 1.1 F03 隔离验证边界
+### 1.1a 首次真实 build-only 结果（失败，已停止）
+
+main `0d4cfc1d` 上单次 dispatch（`publish=false`、版本空）run `42608235225` attempt1 在 build job 失败：容器内 `next build` 报 `Can't resolve '../../tailwind.config.js'`。白名单 context 漏了 `tailwind.config.js`，而 `src/styles/globals.css` 用 `@config '../../tailwind.config.js'` 引用它。未 rerun、未重新 dispatch、未登录 Docker Hub、未推送镜像，publish job 被跳过。
+
+本地修复：将 `tailwind.config.js` 加入 `scripts/fork-image-context.mjs` 白名单，并新增“与 globals.css 一起导出”的回归断言；现 context 669 文件、无 `config/`，2457 测试/Lint/隔离构建通过。**镜像内构建与本地构建的差异必须靠该回归守护，不能只用本地构建代签。** 重验需另行授权。
 
 - scripts/fork-image-http.mjs使用随机虚构JSON/YAML配置、随机测试密码和Secret；真实配置和生产凭据不进入容器、argv、日志或artifacts。随机测试密码/Secret经Docker stdin提供，不创建环境文件；不继承宿主GitHub/Hub/NextAuth凭据或Docker远程连接设置。
 - 端口只映射127.0.0.1随机端口，原生Host校验保持启用。HTTP客户端不使用代理、不跟随重定向、限制响应大小及等待时间；检查Location和Next数据的x-nextjs-redirect，两者存在时均须为同源登录页。
