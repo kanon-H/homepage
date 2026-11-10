@@ -4,7 +4,7 @@ import { closeSync, createReadStream, lstatSync, openSync, statfsSync, unlinkSyn
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isSha, isVersion, REPOSITORY, requireRelease, verifyReleaseSource } from "./fork-release.mjs";
+import { isSha, isVersion, PLATFORMS, REPOSITORY, requireRelease, verifyReleaseSource } from "./fork-release.mjs";
 
 export function parseMetadata(text) {
   try {
@@ -54,24 +54,25 @@ export function inspectArchive(archive, plan, tool = runTool) {
   // buildx may wrap the platform list in an extra annotations-only index.
   if (Array.isArray(index.manifests) && index.manifests.length === 1 && !index.manifests[0].platform) {
     const inner = index.manifests[0].digest;
-    requireRelease(/^sha256:[0-9a-f]{64}$/.test(inner || ""), "EXPECTED_TWO_PLATFORMS");
+    requireRelease(/^sha256:[0-9a-f]{64}$/.test(inner || ""), "EXPECTED_PLATFORMS");
     index = parseMetadata(tool("tar", ["-xOf", archive, `blobs/sha256/${inner.slice(7)}`]));
   }
-  requireRelease(Array.isArray(index.manifests), "EXPECTED_TWO_PLATFORMS");
+  requireRelease(Array.isArray(index.manifests), "EXPECTED_PLATFORMS");
   // Attestation/provenance manifests carry platform unknown/unknown. They are not
-  // runnable images, so select real linux/amd64 and linux/arm64 manifests explicitly
-  // instead of demanding that the archive contain exactly two entries.
+  // runnable images, so select real linux manifests explicitly instead of demanding a
+  // fixed entry count. The shipped set comes from PLATFORMS so the workflow, the
+  // archive check and the runtime smoke can never disagree about what was built.
   const platforms = index.manifests.filter((m) => m.platform?.os === "linux" && m.platform?.architecture);
   requireRelease(
-    platforms.length === 2 &&
-      ["amd64", "arm64"].every((arch) => platforms.some((m) => m.platform.architecture === arch)),
+    platforms.length === PLATFORMS.length &&
+      PLATFORMS.every((arch) => platforms.some((m) => m.platform.architecture === arch)),
     "WRONG_IMAGE_PLATFORMS",
   );
   requireRelease(
     index.manifests.every((m) => !m.platform || m.platform.os === "linux" || m.platform.os === "unknown"),
     "WRONG_IMAGE_PLATFORMS",
   );
-  for (const arch of ["amd64", "arm64"]) {
+  for (const arch of PLATFORMS) {
     const config = parseMetadata(
       tool("skopeo", [
         "inspect",

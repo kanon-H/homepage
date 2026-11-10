@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { verifyApplication } from "./fork-image-http.mjs";
 import { fileDigest, inspectArchive, runTool } from "./fork-image-publish.mjs";
-import { requireRelease } from "./fork-release.mjs";
+import { PLATFORMS, requireRelease } from "./fork-release.mjs";
 
 export async function smokeArchive(archive, plan, deps = {}) {
   const tool = deps.tool || runTool;
@@ -23,7 +23,7 @@ export async function smokeArchive(archive, plan, deps = {}) {
     if (fs.existsSync('/app/config') && fs.readdirSync('/app/config').length) throw Error('Unexpected baked config');
     if (fs.existsSync('/app/.env') || fs.existsSync('/app/.env.local')) throw Error('Unexpected environment file');
   `;
-  for (const arch of ["amd64", "arm64"]) {
+  for (const arch of PLATFORMS) {
     const image = `homepage-fork-smoke-${randomUUID()}:${arch}`;
     let loaded = false;
     try {

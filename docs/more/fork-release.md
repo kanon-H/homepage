@@ -1,6 +1,8 @@
 # Fork 镜像发布与回滚（Docker Hub）
 
-> 本文随 Fork 发布基础交付，实际分支、提交与 PR 状态以 Git/GitHub 为准；工作流存在、策略测试或普通应用 CI 成功都不等于镜像已构建或发布。本次开发主机没有 Docker/Podman，真实双架构容器/注册表验收须按下列步骤另行核实。
+> 本文随 Fork 发布基础交付，实际分支、提交与 PR 状态以 Git/GitHub 为准；工作流存在、策略测试或普通应用 CI 成功都不等于镜像已构建或发布。
+>
+> **当前发布平台仅为 `linux/amd64`。** arm64 在 GitHub Actions 的 QEMU 下编译 Next.js 会 `SIGILL` 崩溃；同一源码在私有 Docker 主机上 arm64 构建成功，故这是模拟环境限制而非代码问题。恢复 arm64 应先实施 `BUILDPLATFORM` 交叉编译并另行验证，不得靠重试或降级断言绕过。平台集合由 `scripts/fork-release.mjs` 的 `PLATFORMS` 唯一决定。
 
 ## 0. 本次目标：正式多地址镜像，不走预览捷径
 
@@ -18,8 +20,8 @@
 2. 版本必须是已存在且属于 main 历史的 `fork-vX.Y.Z`，不接受任意分支/SHA、上游 `v*`、预发布后缀或 `latest`。版本源码的发布关键文件必须与当前 main 一致；老版本没有发布基础、或发布基础发生变化时拒绝。
 3. 自有标签 push 的 **Fork version tag notification** 不 checkout 或执行标签代码，不接触注册表凭据，只向 main 的发布控制器发一次 dispatch。HTTP204 仅说明请求被接受，需查看另一个发布 run。拒绝 rerun 通知任务；未知响应先查询实际 main runs，不盲重发。
 4. main 控制器核对事件/工作流来源、实时 main、标签实际 commit 和祖先，固定官方 main 只读查询并记录共同上游基线。规划和发布前分别读取 main/tag，检测到改动则停止；不是自动追最新提交，也不是跨 GitHub/Hub 的原子事务，仍需不可变版本标签规则兜底。
-5. 无注册表凭据的 build job：精确源码/Node/pnpm、frozen install、Lint、全量测试、隔离应用构建；从 Git 对象导出允许文件组成 context，再分别构建 amd64/arm64，禁止复用宿主 `.next`/node_modules。输出 OCI archive。
-6. 上传前核查两架构和版本/源码/上游/GPL标签。最新F03实现中，fork-image-smoke先固定归档SHA，再从同归档分别导入amd64/arm64，做Node结构检查并启动真实应用；每平台检查默认root+/app/config及PUID10001/PGID10002+/config，必须完成健康、PID1身份、卷读写、HTTP密码登录/退出、Host、匿名与私有缓存和SSR/API/Next数据一致性。归档前后SHA不变才继续上传。此代码须受审进入main并实跑，**不替代物理ARM、OIDC、HTTPS/CDN、真实NAS文件系统或P5人工验收**。
+5. 无注册表凭据的 build job：精确源码/Node/pnpm、frozen install、Lint、全量测试、隔离应用构建；从 Git 对象导出允许文件组成 context，再按 `PLATFORMS`（当前仅 `linux/amd64`）构建，禁止复用宿主 `.next`/node_modules。输出 OCI archive。
+6. 上传前核查平台集合与版本/源码/上游/GPL标签。fork-image-smoke先固定归档SHA，再从同归档按 `PLATFORMS` 逐个导入，做Node结构检查并启动真实应用；每个平台检查默认root+/app/config及PUID10001/PGID10002+/config，必须完成健康、PID1身份、卷读写、HTTP密码登录/退出、Host、匿名与私有缓存和SSR/API/Next数据一致性。归档前后SHA不变才继续上传。此代码已受审进入main并在真实双架构归档上验证过四种组合；**不替代物理ARM、OIDC、HTTPS/CDN、真实NAS文件系统或P5人工验收**。
 7. publisher 等待 `dockerhub-release` Environment；只运行 main 控制器，不安装应用依赖、不重建、不执行 artifact 脚本。下载同一 build job 的精确 artifact ID，核对 archive SHA256，再核对实时 main/tag 和镜像标签。
 8. Docker Hub 两个目标标签均不存在时，才各 copy 一次：`fork-vX.Y.Z`、`sha-<完整源码SHA>`。不更新 latest、主次版本别名或已有标签。复制后读回 digest 必须与测试的 OCI index 一致，输出 `release.json`。
 
@@ -78,11 +80,11 @@ Docker Hub 密钥只传给 publisher 的一个步骤；Skopeo 使用 Linux tmpfs
 按顺序，不跳过；基础验证和最终正式候选验证必须分开记录：
 
 1. 单独授权PR #4审查/Ready/merge入main，核新main精确CI；不沿用旧head绿色，不提前合PR #1。
-2. 获准后仅运行main `publish=false`、空版本的基础双架构构建。记录实际Docker/OCI/Skopeo/context/结构冒烟及archive SHA，不登录或推送Hub；无导航时不能当正式成果。
+2. 获准后仅运行main `publish=false`、空版本的构建。记录实际Docker/OCI/Skopeo/context/结构冒烟及archive SHA，不登录或推送Hub；无导航时不能当正式成果。
 3. 本地F03已补足可重复HTTP/原生认证/Host/匿名隔离/配置挂载/PUID/健康验证并接入build job；先受审集成最新工具，再在同一真实归档上实跑。当前native103项及模拟Docker测试不能代签容器门禁，未通过不上传归档或进入publisher。
 4. 完成非手机P5和适用目标安全验收，保留真实OS/浏览器/设备/配置代号。其它现有必需验收如上游写入/权限/调度或门禁负例也继续逐项给证据；若外部条件不足记阻塞，不能自行N/A或no-op代签。仅手机兼容延期。
 5. 保存工作后将最新main保留历史merge到feature，审查二开/发布关键文件和指南冲突；完整回归及新head CI通过后，单独授权PR #1 Ready/merge到main并核main CI。
-6. 对最终**含多地址功能**的main源码重新验证双架构和全部适用镜像门禁。正式run中实际推送的**同一OCI归档**必须通过HTTP/认证等检查；另一轮build-only的不同version/created/digest不能代替。失败先修复和受审，不降低断言。
+6. 对最终**含多地址功能**的main源码重新验证 `PLATFORMS` 内的平台和全部适用镜像门禁。正式run中实际推送的**同一OCI归档**必须通过HTTP/认证等检查；另一轮build-only的不同version/created/digest不能代替。失败先修复和受审，不降低断言。
 7. 所有者配置Environment/标签保护/Hub不可变策略/目标仓库与最小权限Secrets；在隔离环境用可信基础/旧版与候选演练配置兼容和回退。首次无旧正式版也不能虚构已验旧digest；不操作生产。
 8. 预发布门禁完成后，由用户确认正式版本及精确main源、单独授权开启opt-in并创建/推送自有标签（以下只是命令格式示例，不是已选定版本或本文自动执行）：
 
@@ -94,7 +96,7 @@ Docker Hub 密钥只传给 publisher 的一个步骤；Skopeo 使用 Linux tmpfs
    也可在 main 手动选已存在版本标签并显式 `publish=true`。不要对未知结果 rerun 通知/发布；新 dispatch 也是发布操作，须先调查并另行确认。
 
 9. 审批Environment，跟踪main正式run，核对release.json的源码/upstream/version/created、同归档SHA、两个标签/index digest及平台清单；手机延期/已知差异写入发布说明。通知或push成功不等于正式交付完成。
-10. 发布后独立客户端实际pull精确digest；public匿名、private目标身份分别按适用范围验证，两平台实际临时运行，并核回退digest可拉取。未完成这些交付验收，不宣布正式版验收完成。
+10. 发布后独立客户端实际pull精确digest；public匿名、private目标身份分别按适用范围验证，`PLATFORMS` 内每个平台实际临时运行，并核回退digest可拉取。未完成这些交付验收，不宣布正式版验收完成。发布说明必须写明当前仅提供 `linux/amd64`。
 11. 归档非秘密源码/许可、全部验证及失败/回退记录；根GPLv3、GPL-3.0-only标签/镜像LICENSE一致，完整revision可追溯。源配置、Cookie/Session、Token不进记录。
 
 发布控制器同一时刻串行，`cancel-in-progress=false`；GitHub concurrency **不是可靠无限队列**，密集版本事件可能替换 pending run。每个版本都要核实实际 run，不承诺每个标签自动成功发布。OCI artifacts 保留 7 天，发布记录保留 90 天；长期记录由所有者归档。环境中 apt/Skopeo 版本未完全锁定，不宣称位级可复现。暂未启用 SBOM/provenance，后续单独评估，不能声称已签名供应链。
@@ -121,7 +123,7 @@ Docker Hub 密钥只传给 publisher 的一个步骤；Skopeo 使用 Linux tmpfs
 
 - [x] 发布基础独立Draft PR #4/head89f0a542与对应真实应用CI。
 - [ ] 单独授权PR #4 Ready/merge与新main CI；不能直接合PR #1走捷径。
-- [ ] main build-only 的实际双架构 OCI 构建、上下文核验和结构冒烟。
+- [ ] main build-only 的实际 OCI 构建、上下文核验和结构冒烟（当前平台集合为 amd64）。
 - [ ] 补足并实跑HTTP/认证/Host/挂载/PUID/健康检查，纳入最终同归档发布门禁。
 - [ ] 非手机P5、适用目标认证/缓存与其它必需验收完成或记录明确阻塞；只有手机兼容延期。
 - [ ] 最新main同步feature/完整新CI，单独审查PR #1合入main。
