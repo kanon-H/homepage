@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,8 +27,11 @@ export async function smokeArchive(archive, plan, deps = {}) {
   `;
   for (const arch of PLATFORMS) {
     const image = `homepage-fork-smoke-${randomUUID()}:${arch}`;
+    const dockerArchive = `${tmpdir()}/homepage-smoke-${randomUUID()}.tar`;
     let loaded = false;
     try {
+      // skopeo 1.x talks to the Docker daemon over a pipe that Docker 29 rejects, so
+      // convert to a docker-archive first and let `docker load` ingest it.
       tool("skopeo", [
         "copy",
         "--override-os",
@@ -34,9 +39,11 @@ export async function smokeArchive(archive, plan, deps = {}) {
         "--override-arch",
         arch,
         `oci-archive:${archive}`,
-        `docker-daemon:${image}`,
+        `docker-archive:${dockerArchive}:${image}`,
       ]);
+      tool("docker", ["load", "-i", dockerArchive]);
       loaded = true;
+      rmSync(dockerArchive, { force: true });
       tool("docker", [
         "run",
         "--rm",
@@ -63,6 +70,7 @@ export async function smokeArchive(archive, plan, deps = {}) {
       for (const result of results) report(result);
     } finally {
       if (loaded) tool("docker", ["image", "rm", image]);
+      rmSync(dockerArchive, { force: true });
     }
   }
   requireRelease((await hash(archive)) === archiveSha, "SMOKE_ARCHIVE_CHANGED");

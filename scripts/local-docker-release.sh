@@ -76,7 +76,8 @@ UPSTREAM="$(git rev-parse HEAD:scripts/fork-release.mjs >/dev/null 2>&1 && echo 
 
 OUT_DIR="${TMPDIR:-/tmp}/homepage-local-release"
 ARCHIVE="$OUT_DIR/image.tar"
-CONTEXT="$OUT_DIR/context"
+# fork-image-context.mjs 固定写到 $RUNNER_TEMP/fork-release/context，这里保持一致。
+CONTEXT="$OUT_DIR/fork-release/context"
 
 note "提交：$SHA$DIRTY"
 note "镜像：docker.io/${IMAGE}"
@@ -97,7 +98,30 @@ note "从 Git 跟踪文件导出构建上下文（不含 config/、.env、.git�
 RELEASE_SOURCE_SHA="$SHA" RUNNER_TEMP="$OUT_DIR" node scripts/fork-image-context.mjs
 
 note "构建镜像（$PLATFORM_LIST）"
+# `type=oci` 需要 containerd image store 或 docker-container 驱动的 builder。
+# 默认 docker 驱动会报 "OCI exporter is not supported"，所以这里自备一个临时 builder。
+BUILDER_ARGS=()
+TMP_BUILDER=""
+created_builder() {
+  if docker buildx inspect "$1" >/dev/null 2>&1; then
+    docker buildx rm "$1" >/dev/null 2>&1 || true
+  fi
+}
+if ! docker buildx build --help 2>/dev/null | grep -q 'output'; then
+  die "docker buildx 不可用，请安装 buildx"
+fi
+DRIVER="$(docker buildx inspect --bootstrap 2>/dev/null | awk '/^Driver:/{print $2}')"
+if [ "$DRIVER" != "docker-container" ]; then
+  TMP_BUILDER="hp-release-builder-$$"
+  note "当前 builder 驱动为 ${DRIVER:-unknown}，创建临时 docker-container builder：$TMP_BUILDER"
+  trap 'created_builder "$TMP_BUILDER"' EXIT
+  docker buildx create --name "$TMP_BUILDER" --driver docker-container --bootstrap >/dev/null ||
+    die "无法创建 docker-container builder"
+  BUILDER_ARGS=(--builder "$TMP_BUILDER")
+fi
+
 docker buildx build \
+  ${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"} \
   --platform "$PLATFORM_LIST" \
   --file "$CONTEXT/Dockerfile.fork" \
   --build-arg "BUILDTIME=$CREATED" \

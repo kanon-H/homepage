@@ -49,8 +49,15 @@ export async function fileDigest(path) {
 }
 
 export function inspectArchive(archive, plan, tool = runTool) {
+  // Prefer the archive's own index.json: for a single-platform archive,
+  // `skopeo inspect --raw` returns the image manifest rather than the index.
+  let index;
+  try {
+    index = parseMetadata(tool("tar", ["-xOf", archive, "index.json"]));
+  } catch {
+    index = parseMetadata(tool("skopeo", ["inspect", "--raw", `oci-archive:${archive}`]));
+  }
   const raw = tool("skopeo", ["inspect", "--raw", `oci-archive:${archive}`]);
-  let index = parseMetadata(raw);
   // buildx may wrap the platform list in an extra annotations-only index.
   if (Array.isArray(index.manifests) && index.manifests.length === 1 && !index.manifests[0].platform) {
     const inner = index.manifests[0].digest;

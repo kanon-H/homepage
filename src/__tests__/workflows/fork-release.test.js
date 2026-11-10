@@ -454,6 +454,19 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     // An empty platform set is reported by the platform gate, not the shape gate.
     expect(() => inspectArchive(request.archive, plan, () => '{"manifests":[]}')).toThrow("WRONG_IMAGE_PLATFORMS");
   });
+  it("reads the archive's own index.json so a single-platform archive is not misread", () => {
+    // `skopeo inspect --raw` returns the image manifest (no `manifests`) for a
+    // single-platform archive, so the archive index must be the primary source.
+    const single = JSON.stringify({ manifests: [{ platform: { os: "linux", architecture: "amd64" } }] });
+    const tool = vi.fn((command, args) => {
+      if (command === "tar") return single;
+      if (args.includes("--raw"))
+        return JSON.stringify({ schemaVersion: 2, mediaType: "application/vnd.oci.image.manifest.v1+json" });
+      return metadataTool(command, args);
+    });
+    expect(inspectArchive(request.archive, plan, tool)).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(tool).toHaveBeenCalledWith("tar", ["-xOf", request.archive, "index.json"]);
+  });
   it("resolves a wrapped index from the archive blob store and ignores attestations", () => {
     const innerDigest = `sha256:${"c".repeat(64)}`;
     const outer = JSON.stringify({ manifests: [{ digest: innerDigest }] });
@@ -575,6 +588,13 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     for (const [, args] of runs)
       expect(args).toEqual(expect.arrayContaining(["--rm", "--read-only", "--network", "none", "--cap-drop=ALL"]));
     expect(tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "image")).toHaveLength(1);
+    // skopeo 1.x cannot hand a blob stream to Docker 29 over its pipe, so the archive is
+    // converted to a docker-archive and ingested with `docker load`.
+    const copies = tool.mock.calls.filter(([command, args]) => command === "skopeo" && args[0] === "copy");
+    expect(copies).toHaveLength(1);
+    expect(copies[0][1].some((arg) => arg.startsWith("docker-archive:"))).toBe(true);
+    expect(copies[0][1].some((arg) => arg.startsWith("docker-daemon:"))).toBe(false);
+    expect(tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "load")).toHaveLength(1);
   });
   it("fails on an application gate failure and still removes the loaded image", async () => {
     const tool = vi.fn(metadataTool);
