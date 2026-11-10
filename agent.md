@@ -25,7 +25,30 @@
 - GitHub Actions 测试并发布 Docker Hub 镜像；Gitea 单向备份仍可选。
 - 最新发布目标是正式多地址镜像：仅P5手机兼容验收延期，其余必需工作完成后发布；不采用预览/直接合PR #1的更快路线，不开发Skill。手机已知差异保留为延期未完成，见SPEC12.1及DEVELOPMENT14。
 
-## 当前状态：容器门禁 6 个真实缺陷已修复，并在 fnos-max 真实双架构上端到端通过
+## 当前状态：容器门禁 6 个缺陷已修复入 main；arm64 受 CI QEMU 限制，用户决定先只发 amd64
+
+main 现为 `197a7990bdce224185f5d9585f2169f1ddbabe4a`（PR #8 merge），已含 G1～G6 全部门禁修复。第五次 `publish=false` 实跑 run `42655571841` 仍失败，但性质变了：
+
+```text
+qemu: uncaught target signal 4 (Illegal instruction) - core dumped
+Next.js build worker exited with code: null and signal: SIGILL
+```
+
+**arm64 在 GitHub Actions 的 QEMU 模拟下执行 webpack 构建时崩溃。** 交叉验证：同一源码在 `fnos-max` 上 arm64 单架构构建**成功**（81MB 归档），且双架构归档四组合各 103 项检查均通过。因此这不是代码/Dockerfile/依赖回归，而是 CI 模拟环境限制。
+
+结构原因：`Dockerfile.fork` 让 builder 阶段在**目标架构**下跑 `pnpm build`，强制全 arm64 模拟。标准解法是 builder 用 `--platform=$BUILDPLATFORM` 原生构建、仅 runner 用 `TARGETPLATFORM`，此项**尚未实施**。
+
+**用户决定：先只发布 amd64，arm64 待 QEMU 问题解决后再补。** 本轮到此停止，不再重跑。
+
+### P6 第十七小步：第五轮与 arm64 QEMU 限制（最新）
+
+- 已交付：PR #8（`e54c2386`）经真实 CI run `42652886287` 审查后以 merge commit 合入 main `197a7990`，双父 `[a76bf472, e54c2386]`，源分支保留，保护未变；新 main CI run `42653992272` attempt1 全步骤成功。
+- 证据：`config/p6-image-http/evidence/round5-arm64-qemu.json`、`release5-build-log.txt`、`release5-run-summary.json`。
+- 五个失败 run（`42608235225`/`42615682764`/`42622961033`/`42631136692`/`42655571841`）全部保留，未 rerun；未登录 Hub、未推送镜像、未改 Secrets/设置。
+- 服务器调试资源已按唯一标签清理，生产容器 76 → 76 未被触碰。
+- 若要恢复 arm64：优先实施交叉编译，并在 `fnos-max` 先验证再花 CI；不要靠增加重试或降级断言绕过 SIGILL。
+
+### P6 第十六小步：容器门禁 6 个真实缺陷定位与修复（历史）
 
 main 现为 `a76bf47288d41324ae53821191fb8843f7e4f74b`（PR #7 merge）。四次 `publish=false` 实跑全部失败，但现已定位：**镜像构建本身在第 3 轮已成功**，后续失败全部来自发布门禁自身的缺陷，不是产品回归。
 
