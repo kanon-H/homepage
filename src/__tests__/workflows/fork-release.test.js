@@ -33,6 +33,7 @@ import {
   githubGet,
   isSha,
   isVersion,
+  PLATFORMS,
   prepareRelease,
   RELEASE_FILES,
   releaseContext,
@@ -147,9 +148,11 @@ describe("Fork release workflow boundaries", () => {
       "persist-credentials": false,
     });
     const builder = workflow.jobs.build.steps.find((s) => s.uses?.startsWith("docker/build-push-action@"));
+    // The workflow, the archive check and the runtime smoke must agree on platforms.
+    expect(builder.with.platforms).toBe(PLATFORMS.map((arch) => `linux/${arch}`).join(","));
     expect(builder.with).toMatchObject({
       push: false,
-      platforms: "linux/amd64,linux/arm64",
+      platforms: "linux/amd64",
       provenance: false,
       sbom: false,
       context: "${{ runner.temp }}/fork-release/context",
@@ -380,7 +383,6 @@ describe("committed image context, not operator working tree", () => {
 const rawIndex = JSON.stringify({
   manifests: [
     { platform: { os: "linux", architecture: "amd64" } },
-    { platform: { os: "linux", architecture: "arm64" } },
     // Real buildx archives also carry provenance manifests with unknown platforms.
     { platform: { os: "unknown", architecture: "unknown" } },
   ],
@@ -458,7 +460,6 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     const inner = JSON.stringify({
       manifests: [
         { platform: { os: "linux", architecture: "amd64" } },
-        { platform: { os: "linux", architecture: "arm64" } },
         { platform: { os: "unknown", architecture: "unknown" } },
       ],
     });
@@ -473,11 +474,16 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     });
     expect(inspectArchive(request.archive, plan, tool)).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(tool).toHaveBeenCalledWith("tar", expect.any(Array));
-    // A single platform is still rejected even when wrapped.
-    const onlyAmd64 = JSON.stringify({ manifests: [{ platform: { os: "linux", architecture: "amd64" } }] });
+    // A platform that is not in the shipped set is still rejected, even when wrapped.
+    const withArm64 = JSON.stringify({
+      manifests: [
+        { platform: { os: "linux", architecture: "amd64" } },
+        { platform: { os: "linux", architecture: "arm64" } },
+      ],
+    });
     expect(() =>
       inspectArchive(request.archive, plan, (command, args) =>
-        command === "tar" ? onlyAmd64 : args.includes("--raw") ? outer : metadataTool(command, args),
+        command === "tar" ? withArm64 : args.includes("--raw") ? outer : metadataTool(command, args),
       ),
     ).toThrow("WRONG_IMAGE_PLATFORMS");
     // The digest identity must still come from the outer index bytes.
@@ -562,13 +568,13 @@ describe("OCI publication checks (mock registry/tools, not Docker Hub proof)", (
     await expect(smokeArchive(request.archive, plan, { tool, application, hash, report: vi.fn() })).resolves.toBe(
       manifestDigest,
     );
-    expect(application.mock.calls.map(([, arch]) => arch)).toEqual(["amd64", "arm64"]);
+    expect(application.mock.calls.map(([, arch]) => arch)).toEqual(["amd64"]);
     expect(hash).toHaveBeenCalledTimes(2);
     const runs = tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "run");
-    expect(runs).toHaveLength(2);
+    expect(runs).toHaveLength(1);
     for (const [, args] of runs)
       expect(args).toEqual(expect.arrayContaining(["--rm", "--read-only", "--network", "none", "--cap-drop=ALL"]));
-    expect(tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "image")).toHaveLength(2);
+    expect(tool.mock.calls.filter(([command, args]) => command === "docker" && args[0] === "image")).toHaveLength(1);
   });
   it("fails on an application gate failure and still removes the loaded image", async () => {
     const tool = vi.fn(metadataTool);
