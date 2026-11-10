@@ -38,7 +38,7 @@ Next.js build worker exited with code: null and signal: SIGILL
 
 结构原因：`Dockerfile.fork` 让 builder 阶段在**目标架构**下跑 `pnpm build`，强制全 arm64 模拟。标准解法是 builder 用 `--platform=$BUILDPLATFORM` 原生构建、仅 runner 用 `TARGETPLATFORM`，此项**尚未实施**。
 
-**用户决定：先只发布 amd64，arm64 待 QEMU 问题解决后再补。** 本轮到此停止，不再重跑。
+**用户决定：先只发布 amd64，arm64 待 QEMU 问题解决后再补。** 该决定已落地为代码：`scripts/fork-release.mjs` 的 `PLATFORMS = ["amd64"]` 是唯一平台来源，工作流 `platforms`、归档平台断言、运行时冒烟循环均由其派生，并有一条测试断言工作流串必须等于 `PLATFORMS`。恢复 arm64 只需改该常量并重验（仍建议先做 `BUILDPLATFORM` 交叉编译）。本轮尚未提交这批 amd64-only 改动，未 rerun、未登录 Hub、未推送镜像。
 
 ### P6 第十七小步：第五轮与 arm64 QEMU 限制（最新）
 

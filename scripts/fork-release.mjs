@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 import { fetchUpstreamMain, gitCommand } from "./fork-upstream-preflight.mjs";
 
 export const REPOSITORY = "kanon-H/homepage";
+// Single source of truth for the shipped platforms. arm64 is intentionally absent:
+// Next.js compilation dies under the Actions QEMU emulation (SIGILL). Restoring it
+// requires cross-compiling with BUILDPLATFORM, not wider retries or weaker checks.
+export const PLATFORMS = ["amd64"];
 export const RELEASE_FILES = [
   ".github/workflows/fork-release.yml",
   ".github/workflows/fork-release-tag.yml",

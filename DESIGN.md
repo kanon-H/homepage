@@ -350,7 +350,7 @@ gethomepage/homepage main
 
 用户本轮选择 Docker Hub，替代原 GHCR 优先计划；镜像默认 Docker Hub 用户名/homepage，可用 DOCKERHUB_IMAGE 指定组织仓库。自有版本仅接受 fork-vX.Y.Z，与上游 v* 标签区分，不发布 latest。新工作流与四份stdlib发布工具已独立提交89f0a542并创建Draft PR #4，其真实应用CI通过；尚未合入main或实跑镜像，实际启用/发布需要后续授权和设置。配置与完整操作见[发布指南](docs/more/fork-release.md)，开发追踪见 DEVELOPMENT 第 13 节。
 
-Fork 专用 Dockerfile.fork/白名单 context 不修改上游 Dockerfile：同 Alpine 的 Node24.22.1 多平台 digest、pnpm10.34.9、GPL-3.0-only 和 LICENSE 固定。main-only 控制器验证真实 main/tag/祖先及发布关键文件；版本标签通知只 dispatch main，不执行候选代码或读注册表凭据。无 Docker Hub 凭据的 build job 从 Git 对象导出安全 context，重跑质量门禁、构建双架构 OCI 并做两平台运行时结构冒烟。独立 Environment publisher 只运行可信 main 代码，验证同一 build artifact ID/SHA 与 OCI 元信息后原样 copy，不在持有注册表凭据时重建/安装应用代码。Token 用未链接 tmpfs FD，仅在内存，不进入镜像、argv 或子进程环境。
+Fork 专用 Dockerfile.fork/白名单 context 不修改上游 Dockerfile：同 Alpine 的 Node24.22.1 多平台 digest、pnpm10.34.9、GPL-3.0-only 和 LICENSE 固定。main-only 控制器验证真实 main/tag/祖先及发布关键文件；版本标签通知只 dispatch main，不执行候选代码或读注册表凭据。无 Docker Hub 凭据的 build job 从 Git 对象导出安全 context，重跑质量门禁、按 `PLATFORMS` 构建 OCI 并对每个平台做结构与运行时冒烟。**当前 `PLATFORMS` 仅含 `linux/amd64`**：arm64 在 Actions QEMU 下编译 Next.js 会 SIGILL 崩溃，同一源码在私有 Docker 主机可构建成功，故属模拟环境限制；恢复 arm64 需先做 `BUILDPLATFORM` 交叉编译，不得靠重试或降级断言。独立 Environment publisher 只运行可信 main 代码，验证同一 build artifact ID/SHA 与 OCI 元信息后原样 copy，不在持有注册表凭据时重建/安装应用代码。Token 用未链接 tmpfs FD，仅在内存，不进入镜像、argv 或子进程环境。
 
 版本/SHA 标签须都不存在；认证/网络/未知错误失败，不自动重试或覆盖，copy 后 digest 必须读回一致。预检不是注册表原子锁，Docker Hub 服务端不可变策略及 Environment main-only/reviewer 必须在真实启用前核实。真实容器 HTTP/认证/挂载、Hub 推送/独立拉取、旧 digest 回滚和供应链增强都独立待验；默认 opt-in 未设置，结构/模拟测试不能替代这些验收。
 

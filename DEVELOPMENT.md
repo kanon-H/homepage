@@ -828,6 +828,8 @@ F03/F04/F05可在安全前提下并行准备，但F08前必须完成其适用的
 
 第五次 `publish=false` 实跑 run `42655571841` 在构建阶段失败，报 `qemu: uncaught target signal 4 (Illegal instruction)` / `SIGILL`：arm64 在 GitHub Actions 的 QEMU 下执行 Next.js/webpack 构建时崩溃。
 
+**已实施（amd64-only）**：`scripts/fork-release.mjs` 新增唯一平台常量 `PLATFORMS`，工作流 `platforms: linux/amd64`、归档平台断言、运行时冒烟循环全部由它派生；测试断言工作流平台串必须等于 `PLATFORMS`，防止三处再次漂移。arm64 不在其中，恢复时只需改这一个常量并重新验证（仍建议先做 `BUILDPLATFORM` 交叉编译）。
+
 交叉验证：同一源码在私有 Docker 主机（Docker 28.5.2、buildx 0.31.1、已注册 qemu-aarch64）上 arm64 单架构构建成功（81MB 归档），双架构归档的四个挂载/身份组合各 103 项检查全部通过。由此判定这是 CI 模拟环境限制，不是代码、Dockerfile 或依赖回归。
 
 `Dockerfile.fork` 目前让 builder 阶段在目标架构下运行 `pnpm build`，强制全 arm64 模拟。标准解法是 builder 阶段固定 `--platform=$BUILDPLATFORM` 原生构建、仅 runner 阶段使用 `TARGETPLATFORM`；该改造**尚未实施**。
