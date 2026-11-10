@@ -1,5 +1,46 @@
 # Fork 镜像发布与回滚（Docker Hub）
 
+## 0. 本地打包发布（当前采用，不依赖 GitHub Actions）
+
+GitHub 已停止为本 Fork 提供 Actions 运行，因此正式镜像改用本地脚本构建与推送。原 Actions 流水线保留在仓库中作为参考，但当前不作为发布路径。
+
+### 0.1 一次性准备
+
+1. 在一台已安装 Docker（含 buildx）的机器上克隆本仓库。
+2. 复制模板并填写凭据。该文件位于 `config/`，**已被 `.gitignore` 忽略，不会提交**：
+
+   ```bash
+   cp scripts/dockerhub-release.env.example config/dockerhub-release.env
+   # 编辑后填入 DOCKERHUB_USERNAME 与 DOCKERHUB_TOKEN
+   ```
+
+3. `DOCKERHUB_TOKEN` 请用 Docker Hub 的 Access Token（仅需目标仓库 Read & Write），不要使用账号登录密码。
+
+### 0.2 命令
+
+```bash
+bash scripts/local-docker-release.sh --dry-run     # 只校验环境，不构建不推送
+bash scripts/local-docker-release.sh --build-only  # 只构建，产出 OCI 归档与 SHA256
+bash scripts/local-docker-release.sh               # 构建 + 冒烟 + 推送两个标签
+```
+
+脚本行为：
+
+- 平台取自 `scripts/fork-release.mjs` 的 `PLATFORMS`，当前仅 `linux/amd64`。
+- 构建上下文由 Git 跟踪文件白名单导出，**不含** `config/`、`.env*`、`.git`、`node_modules`、`.next`。
+- 若已安装 `skopeo`，会在推送前执行与 CI 相同的运行时冒烟（结构 + 原生登录/Host/挂载/身份/健康）。缺少 skopeo 时会提示并跳过，可用 `SKIP_SMOKE=1` 显式跳过。
+- 推送 `fork-vX.Y.Z` 与 `sha-<完整SHA>` 两个标签，**不写 `latest`**；任一标签已存在则停止，不覆盖。
+- 登录密码经 stdin 传入，不进入 argv；登录配置写在临时目录并在退出时删除。
+- 版本默认取 `package.json` 的版本，生成 `fork-v<version>`；可用 `RELEASE_VERSION` 覆盖。
+
+### 0.3 边界
+
+本地脚本的构建证据**不能**替代此前为 Actions 定义的门禁，也不能证明 arm64 可用。发布说明必须写明当前只提供 `linux/amd64`。凭据文件、真实配置、Cookie/Session 均不得进入 Git、镜像层或发布记录。
+
+## 0.4 原 Actions 流程（保留参考，当前停用）
+
+以下描述的是 Actions 流水线原本的设计。GitHub 已停止为该 Fork 运行 Actions，**现阶段不执行这些步骤**；若日后恢复 Actions，再按下文核实。
+
 > 本文随 Fork 发布基础交付，实际分支、提交与 PR 状态以 Git/GitHub 为准；工作流存在、策略测试或普通应用 CI 成功都不等于镜像已构建或发布。
 >
 > **当前发布平台仅为 `linux/amd64`。** arm64 在 GitHub Actions 的 QEMU 下编译 Next.js 会 `SIGILL` 崩溃；同一源码在私有 Docker 主机上 arm64 构建成功，故这是模拟环境限制而非代码问题。恢复 arm64 应先实施 `BUILDPLATFORM` 交叉编译并另行验证，不得靠重试或降级断言绕过。平台集合由 `scripts/fork-release.mjs` 的 `PLATFORMS` 唯一决定。
