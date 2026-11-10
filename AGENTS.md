@@ -60,6 +60,7 @@
 - 当前普通 `.env` 并未被 Git 全面忽略；Git ignore 与 Docker ignore 是两套边界。
 - 上游集成 PR 保留 merge 历史，不 squash；不强推 main，不盲目解决语义冲突。
 - 上游 Actions 不保证在 Fork 直接可用，尤其发布仓库条件、默认分支和 GITHUB_TOKEN 事件触发限制。
+- 发布有两种并列模式：Actions 流水线（需仓库 Actions 可用）与本地 `scripts/local-docker-release.sh`（凭据在 `.gitignore` 的 `config/dockerhub-release.env`）。产物同源同语义，一个版本只由一种模式发布一次，证据不可互相顶替；不写 `latest`。Gitea act-runner 迁移属未实施计划。
 - 仅当用户要求时执行发布/部署。镜像许可信息与根 LICENSE 保持一致，遵守 GPL v3；向上游贡献前阅读 CONTRIBUTING 的 AI 政策。
 - 结束任务更新交接：实际变更、验证证据、未完成项、下一步。范围/字段/状态变更同步更新对应文档。
 - 不主动委派子 Agent，除非用户或适用项目指令明确授权。

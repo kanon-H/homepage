@@ -18,7 +18,10 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 ENV_FILE="config/dockerhub-release.env"
 MODE="${1:-publish}"
 
-die() { echo "错误：$*" >&2; exit 1; }
+die() {
+  echo "错误：$*" >&2
+  exit 1
+}
 note() { echo "==> $*"; }
 
 command -v git >/dev/null 2>&1 || die "缺少 git"
@@ -57,8 +60,8 @@ if [ -z "$VERSION" ]; then
   VERSION="fork-v${PKG_VERSION}"
 fi
 case "$VERSION" in
-  fork-v[0-9]*.[0-9]*.[0-9]*) ;;
-  *) die "RELEASE_VERSION 必须是 fork-vX.Y.Z 形式，当前为：$VERSION" ;;
+fork-v[0-9]*.[0-9]*.[0-9]*) ;;
+*) die "RELEASE_VERSION 必须是 fork-vX.Y.Z 形式，当前为：$VERSION" ;;
 esac
 
 # 平台集合以代码里的 PLATFORMS 为唯一来源。
@@ -114,10 +117,10 @@ else
   if command -v skopeo >/dev/null 2>&1; then
     note "运行时冒烟：结构 + 原生登录/Host/挂载/身份/健康"
     RELEASE_ARCHIVE="$ARCHIVE" \
-    RELEASE_SOURCE_SHA="$SHA" \
-    RELEASE_VERSION="$VERSION" \
-    RELEASE_UPSTREAM_SHA="$UPSTREAM" \
-    RELEASE_CREATED="$CREATED" \
+      RELEASE_SOURCE_SHA="$SHA" \
+      RELEASE_VERSION="$VERSION" \
+      RELEASE_UPSTREAM_SHA="$UPSTREAM" \
+      RELEASE_CREATED="$CREATED" \
       node scripts/fork-image-smoke.mjs
   else
     note "跳过冒烟：缺少 skopeo。发布前建议安装后重跑。"
@@ -159,8 +162,8 @@ done
 
 note "读回 digest 校验"
 for TAG in "$TAG_VERSION" "$TAG_SHA"; do
-  DIGEST="$(docker manifest inspect --verbose "docker.io/${IMAGE}:${TAG}" 2>/dev/null \
-    | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);process.stdout.write(j.Digest||j.digest||'')}catch{process.stdout.write('')}})" || true)"
+  DIGEST="$(docker manifest inspect --verbose "docker.io/${IMAGE}:${TAG}" 2>/dev/null |
+    node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s);process.stdout.write(j.Digest||j.digest||'')}catch{process.stdout.write('')}})" || true)"
   if [ -n "$DIGEST" ]; then
     echo "    ${IMAGE}:${TAG} -> ${DIGEST}"
   else

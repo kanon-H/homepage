@@ -346,6 +346,8 @@ gethomepage/homepage main
 
 ## 10. 发布与长期存储
 
+**发布路径已拆为两种并列模式（见发布指南 §0～§3）：A) Actions 流水线，逻辑保留，需仓库 Actions 可用；B) 本地 `scripts/local-docker-release.sh` + `config/dockerhub-release.env`（已被 Git 忽略）。两模式产物同源同语义，一个版本只由一种模式发布一次，证据不可互相顶替。用户后续计划迁移到 Gitea act-runner，属未实施计划（§7）。**
+
 **最新用户决定：发布正式多地址镜像，不采用预览/直接合PR #1的更快路线；仅P5手机兼容验证延期，其余必需工作先完成。** 手机已知差异不算通过，行为/认证/缓存合同不改，见SPEC12.1。继续独立PR #4基础集成与验证，完成非手机验收后同步最新main并审查PR #1，再验证最终含导航的同一正式OCI归档。基础main镜像没有导航，不能当成本次正式交付。DEVELOPMENT14逐阶段列出放行/证据/授权；已提交基础仍仅有结构冒烟；最新本地F03增加原生密码/HTTP/Host/私有缓存/挂载/PID1身份/健康验证并接入build job，但须受审进入可信main及真实Docker实跑后才能计入镜像证据。native standalone的103项检查不替代容器或目标OIDC/HTTPS/CDN验收。该F03增量已随PR #4合入main；首次真实build-only因白名单context缺tailwind.config.js而在容器内构建失败，未发布，修复已在本地验证、待授权重验。
 
 用户本轮选择 Docker Hub，替代原 GHCR 优先计划；镜像默认 Docker Hub 用户名/homepage，可用 DOCKERHUB_IMAGE 指定组织仓库。自有版本仅接受 fork-vX.Y.Z，与上游 v* 标签区分，不发布 latest。新工作流与四份stdlib发布工具已独立提交89f0a542并创建Draft PR #4，其真实应用CI通过；尚未合入main或实跑镜像，实际启用/发布需要后续授权和设置。配置与完整操作见[发布指南](docs/more/fork-release.md)，开发追踪见 DEVELOPMENT 第 13 节。

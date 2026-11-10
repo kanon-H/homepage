@@ -25,7 +25,23 @@
 - GitHub Actions 测试并发布 Docker Hub 镜像；Gitea 单向备份仍可选。
 - 最新发布目标是正式多地址镜像：仅P5手机兼容验收延期，其余必需工作完成后发布；不采用预览/直接合PR #1的更快路线，不开发Skill。手机已知差异保留为延期未完成，见SPEC12.1及DEVELOPMENT14。
 
-## 当前状态：容器门禁 6 个缺陷已修复入 main；arm64 受 CI QEMU 限制，用户决定先只发 amd64
+## 当前状态：发布改为"双模式"（Actions + 本地脚本），平台仅 amd64，后续计划迁移 Gitea act-runner
+
+发布文档已重构为两种并行模式，见 [docs/more/fork-release.md](docs/more/fork-release.md)：
+
+- **模式 A（Actions 流水线）**：原有 `fork-release.yml` / `fork-release-tag.yml` 与四个 stdlib 脚本保留，逻辑有效；需要仓库 Actions 可用、`dockerhub-release` Environment 与 Secrets。GitHub 曾因 Fork 计算资源限制停止为本仓库运行 Actions，当前不可用，但不代表该模式被废弃。
+- **模式 B（本地脚本）**：`scripts/local-docker-release.sh` + `scripts/dockerhub-release.env.example`（真实凭据放 `config/dockerhub-release.env`，已被 `.gitignore` 忽略）。支持 `--dry-run` / `--build-only` / 直接推送，产物与模式 A 同源同语义。
+- **§7 预留 Gitea act-runner 迁移**：用户后续计划改用自托管 runner，不再依赖 GitHub。该节只记录复用边界与六项前置条件，**未实施**，不得宣称已支持。
+
+两模式的共同纪律：版本必须 `fork-vX.Y.Z`、不写 `latest`、推两个标签、读回 digest、一个版本只发一次、发布说明必须写明所用模式与"仅 amd64"。
+
+### P6 第十八小步：发布模式文档重构（最新）
+
+- 重写发布指南为 §0 两模式对照 → §1 模式 A → §2 模式 B → §3 共用纪律 → §4 失败/部分发布 → §5 回滚 → §6 正式镜像目标 → §7 Gitea 迁移计划 → §8 追踪清单；修正了此前重复的 `## 0.` 编号。
+- 模式 A 的历史调试结论（两个构建输入缺陷 + G1～G6 门禁缺陷 + 真实双架构四组合各 103 项检查）完整保留在 §1.2，并明确该验证属模式 B 前身、不能替代 CI 记录。
+- 本轮只改文档与保留既有脚本格式化；未改业务代码、平台集合、工作流语义；未构建、未推送镜像、未改 Secrets。
+
+### 历史：容器门禁 6 个缺陷已修复入 main；arm64 受 CI QEMU 限制，先只发 amd64
 
 main 现为 `197a7990bdce224185f5d9585f2169f1ddbabe4a`（PR #8 merge），已含 G1～G6 全部门禁修复。第五次 `publish=false` 实跑 run `42655571841` 仍失败，但性质变了：
 

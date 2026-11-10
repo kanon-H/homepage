@@ -771,10 +771,11 @@ shell PATH 未发现 Docker/Podman/独立 actionlint，不由此推断托管诊�
 | P6-R02  | 已合入main；见14节                                      | #4经13文件范围/新head CI审查后merge，保留源分支；首次build-only失败转入R03修复                                                             | main0d4cfc1d双父/树、run42606899680、PR4 run42605650425及merge证据；旧CI不能重用于后续修复 |
 | P6-R03  | 5 次实跑失败；arm64 受 CI QEMU 限制，用户决定先发 amd64 | G1~G6 门禁缺陷均已修复并合入 main；真双架构四模式各 103 检查在私有 Docker 主机通过；剩余失败为 arm64 在 Actions QEMU 下 SIGILL，非代码回归 | amd64 单架构真实 run 通过；arm64 待交叉编译改造后另验，不自动 rerun                        |
 | P6-R04  | 工具本地实现；真实容器待main/运行授权                   | 最新F03接入无Hub凭据build job，双平台/双挂载的HTTP/原生密码/Host/PID1/健康为必经步骤，不操作生产                                           | 同归档真实容器结果/平台/源码/digest；native103项和模拟Docker不能代签                       |
-| P6-R05  | 待所有者配置                                            | 目标 Hub 仓库/可见性/不可变规则、Git 标签保护、main-only Environment/reviewer 和最小权限 Secrets；不把 Token 发给 Agent                    | 脱敏设置读回/生效验证，R03/R04 后才明确启用 DOCKERHUB_RELEASE_ENABLED                      |
-| P6-R06  | 待 R03～R05 和真实发布授权                              | 新 fork-vX.Y.Z 标签或 main 显式 publish；通知成功不等于发布成功                                                                            | main release run、两个标签/index digest、源码/上游/版本/created、release.json              |
-| P6-R07  | 待 R06/独立客户端授权                                   | public 匿名或 private 目标身份独立拉取，验证两平台临时运行                                                                                 | 实际 pull/运行、权限/平台/digest；长期非秘密发布记录                                       |
+| P6-R05  | 待所有者配置                                            | 目标 Hub 仓库/可见性/不可变规则、Git 标签保护、最小权限凭据；两种模式分别配置（A: Environment Secrets；B: 本地 env 文件）                  | 脱敏设置读回/生效验证；B 模式凭据文件确认被 Git 忽略                                       |
+| P6-R06  | 待 R03～R05 与真实发布授权                              | 模式 A：新 fork-vX.Y.Z 标签或 main 显式 publish；模式 B：`bash scripts/local-docker-release.sh`。一个版本只用一种模式发一次                | 发布记录须写明所用模式；两个标签/digest、源码/上游/版本/created                            |
+| P6-R07  | 待 R06/独立客户端授权                                   | public 匿名或 private 目标身份独立拉取，`PLATFORMS` 内每个平台临时运行                                                                     | 实际 pull/运行、权限/平台/digest；长期非秘密发布记录                                       |
 | P6-R08  | 待首个已验收镜像及演练授权                              | 验证未知响应/部分发布处置与旧 digest 回滚，优先非生产                                                                                      | 原/新 digest 与配置兼容、真实回滚结果；不强推或改旧 tag                                    |
+| P6-R11  | 计划中，未实施                                          | 迁移到 Gitea act-runner 承接打包：复用 stdlib 脚本，替换 GitHub 专有的 Environment/权限/artifact/dispatch，先本地 `act` 跑通 build-only    | 见发布指南 §7 六项前置条件；未实施前不得宣称支持                                           |
 | P6-R09  | 后续单独评估                                            | SBOM/provenance/签名、原生 ARM、apt/Skopeo 更严格复现                                                                                      | 各自实际报告；当前不得声称已具备                                                           |
 | P6-C01  | 补充门禁负例待单独授权                                  | 检查完全缺失、过期 main 等隔离场景，保留保护与原 PR，不合并负例                                                                            | 真实 head/App/blocked 状态、清理和原保护不变证据                                           |
 | P6-S01  | 实现已在 main；真实写入未验                             | 获准后检查真实官方 main 更新，执行同步 PR/CI/Issue/幂等与 workflow-file 权限演练                                                           | 真正新上游双父 PR、分支/dispatch/check/head/App、失败通知与权限证据；no-op 不算正例        |
@@ -824,6 +825,14 @@ F03/F04/F05可在安全前提下并行准备，但F08前必须完成其适用的
 
 发布说明必须包含手机兼容延期/已知浏览器差异，不得写全平台验证完成。正式版本号由用户确认，示例fork-v0.1.0不等于已经选定/创建或已发布；严格使用现有fork-vX.Y.Z格式，不靠preview标签、latest或任意分支绕过门禁。
 
+### 14.4 未完成、阻塞与可选事项如何处理
+
+- “其它工作完成”按所有仍开放的必需门禁逐项给证据，不以整体CI成功替代人工/容器/目标环境结果。缺设备/目标授权就保持未完成；缺真实上游更新或实际调度就记外部阻塞，不能伪造更新、默默豁免或承诺已经完成。若用户要独立排期，先形成新的明确决定再更新表。
+- 本次仅手机兼容有明确延期许可；不把它扩大成整个P5延期，也不降低安全门禁。手机验证以后恢复时保留既有问题与原始反馈，不用jsdom/模拟触屏代签。
+- SBOM/provenance/签名、进一步位级复现和原生ARM设备扩展仍属原已标明的后续增强；Gitea仍为可选单向备份，Skill暂不开发。未完成如实记录，不宣称已具备，也不自行把可选工作变成无限发布阻塞。
+- F11是有副作用的发布动作，F12含发布后交付验收；推送前完成所有可先做门禁，推送后只核实真实注册表结果。回退前先保护配置和日志，不强推main、不改旧标签、不关闭认证。
+- F03允许先做安全的本地准备；最新本地增量保存/推送和独立基础更新尚待明确授权，其后仍是**单独授权F01**。之后每次获准只执行所选范围；失败停止、报告，不自动扩大为部署或重复dispatch。
+
 ### 14.5 arm64 发布范围调整（用户决定，待实施）
 
 第五次 `publish=false` 实跑 run `42655571841` 在构建阶段失败，报 `qemu: uncaught target signal 4 (Illegal instruction)` / `SIGILL`：arm64 在 GitHub Actions 的 QEMU 下执行 Next.js/webpack 构建时崩溃。
@@ -841,13 +850,24 @@ F03/F04/F05可在安全前提下并行准备，但F08前必须完成其适用的
 - 恢复 arm64 的首选路径是实施交叉编译，并在私有 Docker 主机先行验证后再花 CI；不得靠增加重试、跳过构建或降级断言绕过 SIGILL。
 - 五个失败 run 全部保留为证据，不 rerun。
 
-### 14.4 未完成、阻塞与可选事项如何处理
+### 14.6 两种发布模式（用户决定，已实施）
 
-- “其它工作完成”按所有仍开放的必需门禁逐项给证据，不以整体CI成功替代人工/容器/目标环境结果。缺设备/目标授权就保持未完成；缺真实上游更新或实际调度就记外部阻塞，不能伪造更新、默默豁免或承诺已经完成。若用户要独立排期，先形成新的明确决定再更新表。
-- 本次仅手机兼容有明确延期许可；不把它扩大成整个P5延期，也不降低安全门禁。手机验证以后恢复时保留既有问题与原始反馈，不用jsdom/模拟触屏代签。
-- SBOM/provenance/签名、进一步位级复现和原生ARM设备扩展仍属原已标明的后续增强；Gitea仍为可选单向备份，Skill暂不开发。未完成如实记录，不宣称已具备，也不自行把可选工作变成无限发布阻塞。
-- F11是有副作用的发布动作，F12含发布后交付验收；推送前完成所有可先做门禁，推送后只核实真实注册表结果。回退前先保护配置和日志，不强推main、不改旧标签、不关闭认证。
-- F03允许先做安全的本地准备；最新本地增量保存/推送和独立基础更新尚待明确授权，其后仍是**单独授权F01**。之后每次获准只执行所选范围；失败停止、报告，不自动扩大为部署或重复dispatch。
+发布路径拆为两种并列模式，产物语义一致（同一镜像定义、同一 `PLATFORMS`、同一标签规则、不写 `latest`）。完整说明见发布指南 §0～§3。
+
+- **模式 A：Actions 流水线。** 原有 `fork-release.yml` / `fork-release-tag.yml` 与四个 stdlib 脚本保留且逻辑有效，前提是仓库 Actions 可用并配置 `dockerhub-release` Environment 与 Secrets。GitHub 曾因 Fork 计算资源限制停止为本仓库运行 Actions，当前不可用，但该模式未被废弃。
+- **模式 B：本地脚本。** `scripts/local-docker-release.sh`，支持 `--dry-run` / `--build-only` / 直接推送；凭据读自 `config/dockerhub-release.env`（已被 `.gitignore` 忽略），模板为 `scripts/dockerhub-release.env.example`。
+
+共用纪律：版本必须 `fork-vX.Y.Z`；推送 `fork-vX.Y.Z` 与 `sha-<完整SHA>` 两个标签；任一已存在即停止不覆盖；推送后读回 digest；**一个版本只由一种模式发布一次**；发布记录必须写明所用模式与"仅 amd64"。
+
+两种模式的证据不可互相顶替：模式 B 的本地构建不能替代模式 A 的 CI 记录，反之亦然。
+
+### 14.7 计划迁移到 Gitea act-runner（未实施）
+
+用户后续计划改用 Gitea act-runner 承接打包，不再依赖 GitHub Actions。迁移应复用现有 stdlib 脚本，替换 GitHub 专有部分：Environment 分支保护/reviewer 校验、`github.token` 权限模型、`actions/upload-artifact`、仓库/标签/祖先校验 API、以及 tag 通知的 dispatch 机制。
+
+前置条件（缺一不可，详见发布指南 §7）：可信源码来源、凭据隔离、冒烟与推送使用同一归档、Docker Hub 服务端标签不可变策略、未知响应失败即停、先用本地 `act` 跑通 build-only。
+
+**当前无任何实现**，不得据此声称已支持。在 act-runner 落地前，模式 B 是 Actions 不可用时的正式替代路径，不是临时权宜。
 
 ## 15. F03 本地验证工具增量（未提交；不代表真实容器已通过）
 
